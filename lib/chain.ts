@@ -29,6 +29,7 @@ export interface RpcLog {
   data: string;
   blockNumber: string;
   transactionHash: string;
+  logIndex: string;
 }
 
 export async function rpc<T>(method: string, params: unknown[]): Promise<T> {

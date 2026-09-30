@@ -4,7 +4,9 @@
  *
  * We deliberately avoid decoding the router's complex path tuple —
  * instead we correlate each swap with the ERC-20 Transfers in the same
- * transaction and match amounts. More robust, same answer.
+ * transaction, matched by log proximity to the swap event. Amounts come
+ * from the transfers themselves (on-chain fact); the event's amount words
+ * are only a matching hint, since their denomination isn't reliable.
  */
 
 import {
@@ -31,9 +33,13 @@ export interface TapeEntry {
   tokenIn: string;
   tokenInSymbol: string;
   amountIn: string; // human-readable
+  amountInRaw: string; // decimal string, for aggregation
+  amountInDecimals: number;
   tokenOut: string;
   tokenOutSymbol: string;
   amountOut: string; // human-readable
+  amountOutRaw: string; // decimal string, for aggregation
+  amountOutDecimals: number;
 }
 
 interface Transfer {
@@ -41,6 +47,7 @@ interface Transfer {
   from: string;
   to: string;
   value: bigint;
+  logIndex: number;
 }
 
 interface TokenMeta {
@@ -122,6 +129,7 @@ function parseTransfer(log: {
   address: string;
   topics: string[];
   data: string;
+  logIndex: string;
 }): Transfer | null {
   if (log.topics.length < 3) return null;
   return {
@@ -129,6 +137,7 @@ function parseTransfer(log: {
     from: addrFromTopic(log.topics[1]),
     to: addrFromTopic(log.topics[2]),
     value: hexToBigInt(log.data),
+    logIndex: Number(log.logIndex),
   };
 }
 
@@ -197,6 +206,9 @@ export async function getRecentSwaps(blockSpan = 300): Promise<{
   }
   const raw: RawEntry[] = [];
 
+  // A tx can carry several swaps — don't let two of them claim the same transfer.
+  const claimedByTx = new Map<string, Set<number>>();
+
   for (const log of swapLogs) {
     // Trader = tx sender. Fall back to indexed topic only if it's non-zero.
     let trader = fromByTx.get(log.transactionHash);
@@ -213,53 +225,53 @@ export async function getRecentSwaps(blockSpan = 300): Promise<{
     if (amountIn === BigInt(0) || amountOut === BigInt(0)) continue;
 
     const txTransfers = transfersByTx.get(log.transactionHash) ?? [];
-
-    // tokenOut: payout to the trader (exact amount match preferred).
-    // Falls back to exact-amount payout to any address (recipient routing),
-    // then largest payout to the trader, then largest non-router payout.
+    const swapIdx = Number(log.logIndex);
     const routerLc = ROUTER.toLowerCase();
     const zero = "0x0000000000000000000000000000000000000000";
-    let outLeg: Transfer | null =
-      txTransfers.find((t) => t.to === trader && t.value === amountOut) ??
-      txTransfers.find(
-        (t) =>
-          t.value === amountOut && t.to !== routerLc && t.from !== trader,
-      ) ??
+    const claimed = claimedByTx.get(log.transactionHash) ?? new Set<number>();
+    const fresh = (t: Transfer) => !claimed.has(t.logIndex);
+    // The transfers nearest the swap event are its legs. "Largest amount"
+    // matching misattributes when a tx carries several swaps or a big
+    // unrelated move — that produced phantom billion-dollar payouts.
+    const byProximity = (cands: Transfer[]) =>
+      cands.sort(
+        (a, b) =>
+          Math.abs(a.logIndex - swapIdx) - Math.abs(b.logIndex - swapIdx),
+      );
+
+    // tokenOut: the payout leg. Exact event-amount match first, then nearest.
+    const outCands = byProximity(
+      txTransfers.filter(
+        (t) => t.to !== routerLc && t.to !== zero && t.from !== trader && fresh(t),
+      ),
+    );
+    const outLeg =
+      outCands.find((t) => t.to === trader && t.value === amountOut) ??
+      outCands.find((t) => t.to === trader) ??
+      outCands[0] ??
       null;
-    if (!outLeg) {
-      for (const t of txTransfers) {
-        if (t.to === trader && (!outLeg || t.value > outLeg.value)) outLeg = t;
-      }
-    }
-    if (!outLeg) {
-      for (const t of txTransfers) {
-        if (
-          t.to !== routerLc &&
-          t.to !== zero &&
-          t.from !== trader &&
-          (!outLeg || t.value > outLeg.value)
-        )
-          outLeg = t;
-      }
-    }
-    // tokenIn: trader's largest outflow; fallback to largest payment into
-    // the router (covers ETH->WETH deposits where no trader outflow exists).
-    let inLeg: Transfer | null = null;
-    for (const t of txTransfers) {
-      if (t.from === trader && (!inLeg || t.value > inLeg.value)) inLeg = t;
-    }
-    if (!inLeg) {
-      for (const t of txTransfers) {
-        if (
-          t.to === ROUTER.toLowerCase() &&
-          (!inLeg || t.value > inLeg.value)
-        )
-          inLeg = t;
-      }
-    }
+
+    // tokenIn: the spend leg. Exact event-amount match first, then nearest.
+    // Falls back to the nearest payment into the router (covers ETH->WETH
+    // deposits where no trader outflow exists).
+    const inCands = byProximity(
+      txTransfers.filter((t) => t.from === trader && fresh(t)),
+    );
+    const inLeg =
+      inCands.find((t) => t.value === amountIn) ??
+      inCands[0] ??
+      byProximity(txTransfers.filter((t) => t.to === routerLc && fresh(t)))[0] ??
+      null;
+
     if (!outLeg || !inLeg) continue;
+    // Legs far from the swap event are dubious correlations, not trades.
+    if (Math.abs(outLeg.logIndex - swapIdx) > 200) continue;
+    if (Math.abs(inLeg.logIndex - swapIdx) > 200) continue;
     // Same token both sides = correlation failure, not a real trade.
     if (inLeg.token === outLeg.token) continue;
+    claimed.add(outLeg.logIndex);
+    claimed.add(inLeg.logIndex);
+    claimedByTx.set(log.transactionHash, claimed);
 
     const tokenIn = inLeg.token;
     const tokenOut = outLeg.token;
@@ -272,6 +284,8 @@ export async function getRecentSwaps(blockSpan = 300): Promise<{
     metasNeeded.add(tokenIn);
     metasNeeded.add(tokenOut);
 
+    // Amounts come from the transfers themselves (on-chain fact), not the
+    // event words — the event's denomination isn't reliable across swaps.
     raw.push({
       txHash: log.transactionHash,
       blockNumber: parseInt(log.blockNumber, 16),
@@ -279,9 +293,9 @@ export async function getRecentSwaps(blockSpan = 300): Promise<{
       trader,
       direction,
       tokenIn,
-      amountInRaw: amountIn,
+      amountInRaw: inLeg.value,
       tokenOut,
-      amountOutRaw: amountOut,
+      amountOutRaw: outLeg.value,
     });
   }
 
@@ -294,6 +308,15 @@ export async function getRecentSwaps(blockSpan = 300): Promise<{
   for (const r of raw) {
     const inMeta = metas.get(r.tokenIn)!;
     const outMeta = metas.get(r.tokenOut)!;
+    // Backstop: no Pons trade moves a billion dollars in one leg.
+    // Anything that large is a correlation artifact, not a trade.
+    const inQuote =
+      STABLES.has(r.tokenIn) &&
+      Number(r.amountInRaw) / 10 ** inMeta.decimals > 1e9;
+    const outQuote =
+      STABLES.has(r.tokenOut) &&
+      Number(r.amountOutRaw) / 10 ** outMeta.decimals > 1e9;
+    if (inQuote || outQuote) continue;
     entries.push({
       txHash: r.txHash,
       blockNumber: r.blockNumber,
@@ -303,9 +326,13 @@ export async function getRecentSwaps(blockSpan = 300): Promise<{
       tokenIn: r.tokenIn,
       tokenInSymbol: inMeta.symbol,
       amountIn: formatAmount(r.amountInRaw, inMeta.decimals),
+      amountInRaw: r.amountInRaw.toString(),
+      amountInDecimals: inMeta.decimals,
       tokenOut: r.tokenOut,
       tokenOutSymbol: outMeta.symbol,
       amountOut: formatAmount(r.amountOutRaw, outMeta.decimals),
+      amountOutRaw: r.amountOutRaw.toString(),
+      amountOutDecimals: outMeta.decimals,
     });
   }
 

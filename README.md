@@ -1,36 +1,44 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Raven
 
-## Getting Started
+**Raven watches the chain so you don't have to.**
 
-First, run the development server:
+Tokens on Pons move fast. Something can go from quiet to gaining serious traction in a matter of minutes, and keeping up with everything on-chain isn't easy.
+
+Raven is a live terminal for Robinhood Chain that tracks bonding curves, graduations, and smart-wallet activity as it happens.
+
+- **Today** shows you what's moving, what's nearing graduation, and where momentum is building.
+- **Flow** lets you follow buys and sells in real time.
+- **Wallets** shows what profitable wallets have been doing.
+
+Instead of constantly checking different places to see what you missed, Raven gives you one place to keep an eye on the chain.
+
+**Raven doesn't predict. It watches what's happening — and puts it in front of you.**
+
+## How it works
+
+One indexing engine feeds all three views. It reads `Swap` events straight from the Pons router contract (`0x65050a9b7e5075a2ba5ced7b1b64ee66262c40dc`) via the Robinhood Chain RPC, correlates each swap with its ERC-20 transfers to identify tokens, traders, and direction, and serves it up through API routes. The frontend polls every 30 seconds — the tab that never closes.
+
+- Chain ID `4663` · RPC `https://rpc.mainnet.chain.robinhood.com`
+- `lib/chain.ts` — RPC client and chain constants
+- `lib/tape.ts` — swap decoder (Flow)
+- `lib/wallets.ts` — wallet activity aggregation (Wallets)
+- `app/api/tape`, `app/api/wallets` — data endpoints
+
+## Run it
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Status
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- [x] Flow — live buy/sell tape
+- [x] Wallets — most-active wallet leaderboard
+- [ ] Today — graduation calendar (in progress)
 
-## Learn More
+## Deploy
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Import the repo on Vercel — no environment variables needed.
