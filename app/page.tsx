@@ -22,9 +22,12 @@ export default function Raven() {
       {/* Header */}
       <header className="border-b border-zinc-800/80">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-4">
-          <div>
-            <h1 className="text-xl font-bold tracking-tight">Raven</h1>
-            <p className="text-xs text-zinc-500">Robinhood Chain · live terminal</p>
+          <div className="flex items-center gap-2.5">
+            <img src="/logo.png" alt="Raven" className="h-8 w-8" />
+            <div>
+              <h1 className="text-xl font-bold tracking-tight">Raven</h1>
+              <p className="text-xs text-zinc-500">Robinhood Chain · live terminal</p>
+            </div>
           </div>
           <div className="text-right font-mono text-[11px] text-zinc-500">
             <div className="flex items-center justify-end gap-1.5">

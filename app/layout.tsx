@@ -12,9 +12,30 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const siteUrl =
+  process.env.NEXT_PUBLIC_SITE_URL ?? "https://raven.vercel.app";
+
 export const metadata: Metadata = {
-  title: "Raven — Robinhood Chain live terminal",
-  description: "What's happening on the chain today: graduations, live trade flow, smart-wallet signals.",
+  metadataBase: new URL(siteUrl),
+  title: "Raven — what's happening on Robinhood Chain",
+  description:
+    "Raven watches the chain so you don't have to. Live graduations, trade flow, and wallet signals on Robinhood Chain.",
+  icons: { icon: "/logo.png", apple: "/logo.png" },
+  openGraph: {
+    title: "Raven — what's happening on Robinhood Chain",
+    description:
+      "Raven watches the chain so you don't have to. Live graduations, trade flow, and wallet signals.",
+    url: siteUrl,
+    siteName: "Raven",
+    images: [{ url: "/og.png", width: 1200, height: 630, alt: "Raven" }],
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Raven — what's happening on Robinhood Chain",
+    description: "Raven watches the chain so you don't have to.",
+    images: ["/og.png"],
+  },
 };
 
 export default function RootLayout({
