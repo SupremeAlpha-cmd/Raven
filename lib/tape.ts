@@ -50,7 +50,7 @@ interface Transfer {
   logIndex: number;
 }
 
-interface TokenMeta {
+export interface TokenMeta {
   symbol: string;
   decimals: number;
 }
@@ -73,7 +73,7 @@ async function ethCall(to: string, data: string): Promise<string> {
   return rpc<string>("eth_call", [{ to, data }, "latest"]);
 }
 
-async function getTokenMeta(address: string): Promise<TokenMeta> {
+export async function getTokenMeta(address: string): Promise<TokenMeta> {
   const key = address.toLowerCase();
   const cached = metaCache.get(key);
   if (cached) return cached;
