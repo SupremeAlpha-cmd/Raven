@@ -5,9 +5,9 @@ import { useAlerts } from "./AlertsContext";
 import { RULE_META, type AlertRuleType } from "@/lib/alerts";
 
 const typeAccent: Record<AlertRuleType, string> = {
-  graduation: "bg-amber-400/15 text-amber-300 border-amber-400/25",
-  whale: "bg-emerald-400/15 text-emerald-300 border-emerald-400/25",
-  launch: "bg-violet-400/15 text-violet-300 border-violet-400/25",
+  graduation: "bg-amber-100 text-amber-700 border-amber-200",
+  whale: "bg-emerald-100 text-emerald-700 border-emerald-200",
+  launch: "bg-violet-100 text-violet-700 border-violet-200",
 };
 
 function timeAgo(ts: number): string {
@@ -26,7 +26,7 @@ function Toggle({ on, onClick }: { on: boolean; onClick: () => void }) {
       onClick={onClick}
       aria-label={on ? "disable rule" : "enable rule"}
       className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
-        on ? "bg-rose-400" : "bg-white/10"
+        on ? "bg-rose-500" : "bg-stone-200"
       }`}
     >
       <span
@@ -63,20 +63,20 @@ export default function AlertsView() {
     <div className="px-4 pb-10">
       {/* Notification permission */}
       {notifPerm !== "granted" && notifPerm !== "unsupported" && (
-        <div className="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-rose-400/20 bg-rose-400/5 px-4 py-3">
-          <p className="text-[13px] text-zinc-300">
+        <div className="mt-3 flex items-center justify-between gap-3 rounded-3xl border border-rose-200 bg-rose-50 px-4 py-3">
+          <p className="text-[13px] text-rose-800">
             Alerts live here. Want them as system notifications too?
           </p>
           <button
             onClick={requestPermission}
-            className="shrink-0 rounded-full bg-rose-400 px-4 py-1.5 text-[13px] font-bold text-[#0b0d12]"
+            className="shrink-0 rounded-full bg-rose-500 px-4 py-1.5 text-[13px] font-bold text-white transition-all hover:bg-rose-400 active:scale-[0.98]"
           >
             Enable
           </button>
         </div>
       )}
       {notifPerm === "denied" && (
-        <p className="mt-3 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-[12px] text-zinc-500">
+        <p className="mt-3 rounded-3xl border border-stone-200/80 bg-white px-4 py-3 text-[12px] text-stone-500 shadow-[0_2px_16px_rgba(28,25,23,0.05)]">
           System notifications are blocked for this site — alerts will still
           appear in the feed below. Re-enable them in your browser's site
           settings.
@@ -85,10 +85,10 @@ export default function AlertsView() {
 
       {/* Rules */}
       <div className="flex items-center justify-between pb-1 pt-5">
-        <p className="font-mono text-[11px] uppercase tracking-wider text-zinc-500">
+        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-rose-700">
           alert rules
         </p>
-        <p className="font-mono text-[11px] text-zinc-600">
+        <p className="font-mono text-[11px] text-stone-400">
           checked every minute
         </p>
       </div>
@@ -99,7 +99,7 @@ export default function AlertsView() {
           return (
             <div
               key={r.id}
-              className={`rounded-2xl border border-white/10 bg-[#12151d] px-4 py-3 ${
+              className={`rounded-3xl border border-stone-200/80 bg-white px-4 py-3 shadow-[0_2px_16px_rgba(28,25,23,0.05)] ${
                 r.enabled ? "" : "opacity-50"
               }`}
             >
@@ -114,7 +114,7 @@ export default function AlertsView() {
                   <button
                     onClick={() => removeRule(r.id)}
                     aria-label="delete rule"
-                    className="rounded-full px-2 py-1 font-mono text-[13px] text-zinc-600 hover:text-rose-300"
+                    className="rounded-full px-2 py-1 font-mono text-[13px] text-stone-400 hover:text-rose-600"
                   >
                     ✕
                   </button>
@@ -122,7 +122,7 @@ export default function AlertsView() {
               </div>
               {meta.needsThreshold && (
                 <div className="mt-2.5 flex items-center gap-2">
-                  <span className="font-mono text-[12px] text-zinc-500">
+                  <span className="font-mono text-[12px] text-stone-500">
                     at / above
                   </span>
                   <input
@@ -132,14 +132,14 @@ export default function AlertsView() {
                     onChange={(e) =>
                       setThreshold(r.id, Number(e.target.value))
                     }
-                    className="w-24 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 font-mono text-[13px] text-zinc-100 outline-none focus:border-rose-400/50"
+                    className="w-24 rounded-lg border border-stone-300 bg-white px-2.5 py-1.5 font-mono text-[13px] text-[#1c1917] outline-none focus:border-rose-400"
                   />
-                  <span className="font-mono text-[12px] text-zinc-500">
+                  <span className="font-mono text-[12px] text-stone-500">
                     {meta.unit}
                   </span>
                 </div>
               )}
-              <p className="mt-1.5 font-mono text-[11px] text-zinc-600">
+              <p className="mt-1.5 font-mono text-[11px] text-stone-500">
                 {meta.hint}
               </p>
             </div>
@@ -148,8 +148,8 @@ export default function AlertsView() {
       </div>
 
       {/* Add rule */}
-      <div className="mt-3 rounded-2xl border border-dashed border-white/15 px-4 py-3">
-        <p className="font-mono text-[11px] uppercase tracking-wider text-zinc-500">
+      <div className="mt-3 rounded-3xl border border-dashed border-stone-300 px-4 py-3">
+        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-stone-400">
           new rule
         </p>
         <div className="mt-2.5 flex flex-wrap items-center gap-2">
@@ -160,7 +160,7 @@ export default function AlertsView() {
               setNewType(t);
               setNewThreshold(String(RULE_META[t].defaultThreshold));
             }}
-            className="rounded-lg border border-white/10 bg-[#12151d] px-2.5 py-1.5 font-mono text-[13px] text-zinc-100 outline-none"
+            className="rounded-lg border border-stone-300 bg-white px-2.5 py-1.5 font-mono text-[13px] text-[#1c1917] outline-none"
           >
             {(Object.keys(RULE_META) as AlertRuleType[]).map((t) => (
               <option key={t} value={t}>
@@ -175,7 +175,7 @@ export default function AlertsView() {
               value={newThreshold}
               onChange={(e) => setNewThreshold(e.target.value)}
               aria-label="threshold"
-              className="w-24 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 font-mono text-[13px] text-zinc-100 outline-none focus:border-rose-400/50"
+              className="w-24 rounded-lg border border-stone-300 bg-white px-2.5 py-1.5 font-mono text-[13px] text-[#1c1917] outline-none focus:border-rose-400"
             />
           )}
           <button
@@ -183,7 +183,7 @@ export default function AlertsView() {
               addRule(newType, Number(newThreshold) || 1);
               setNewThreshold(String(RULE_META[newType].defaultThreshold));
             }}
-            className="rounded-full bg-rose-400 px-4 py-1.5 text-[13px] font-bold text-[#0b0d12]"
+            className="rounded-full bg-rose-500 px-4 py-1.5 text-[13px] font-bold text-white transition-all hover:bg-rose-400 active:scale-[0.98]"
           >
             Add rule
           </button>
@@ -192,20 +192,20 @@ export default function AlertsView() {
 
       {/* Feed */}
       <div className="flex items-center justify-between pb-1 pt-6">
-        <p className="font-mono text-[11px] uppercase tracking-wider text-zinc-500">
+        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-rose-700">
           fired alerts
         </p>
         {feed.length > 0 && (
           <button
             onClick={clearFeed}
-            className="font-mono text-[11px] text-zinc-600 hover:text-zinc-300"
+            className="font-mono text-[11px] text-stone-400 hover:text-stone-600"
           >
             clear all
           </button>
         )}
       </div>
       {feed.length === 0 ? (
-        <p className="rounded-2xl border border-white/10 bg-[#12151d] px-4 py-8 text-center font-mono text-sm text-zinc-500">
+        <p className="rounded-3xl border border-stone-200/80 bg-white px-4 py-8 text-center font-mono text-sm text-stone-500 shadow-[0_2px_16px_rgba(28,25,23,0.05)]">
           nothing fired yet — rules are checked every minute while this tab is
           open
         </p>
@@ -214,24 +214,24 @@ export default function AlertsView() {
           {feed.map((a) => (
             <div
               key={a.id}
-              className="rounded-2xl border border-white/10 bg-[#12151d] px-4 py-3"
+              className="rounded-3xl border border-stone-200/80 bg-white px-4 py-3 shadow-[0_2px_16px_rgba(28,25,23,0.05)]"
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-[14px] font-bold text-zinc-100">
+                  <p className="text-[14px] font-bold text-[#1c1917]">
                     {a.title}
                   </p>
-                  <p className="mt-0.5 font-mono text-[12px] text-zinc-500">
+                  <p className="mt-0.5 font-mono text-[12px] text-stone-500">
                     {a.detail}
                   </p>
                   <div className="mt-1.5 flex items-center gap-3 font-mono text-[11px]">
-                    <span className="text-zinc-600">{timeAgo(a.firedAt)}</span>
+                    <span className="text-stone-400">{timeAgo(a.firedAt)}</span>
                     {a.link && (
                       <a
                         href={a.link}
                         target="_blank"
                         rel="noreferrer"
-                        className="text-rose-300/90 hover:text-rose-200"
+                        className="text-rose-600 hover:text-rose-500"
                       >
                         view on explorer →
                       </a>
@@ -241,7 +241,7 @@ export default function AlertsView() {
                 <button
                   onClick={() => dismissAlert(a.id)}
                   aria-label="dismiss alert"
-                  className="shrink-0 rounded-full px-2 py-1 font-mono text-[13px] text-zinc-600 hover:text-zinc-300"
+                  className="shrink-0 rounded-full px-2 py-1 font-mono text-[13px] text-stone-400 hover:text-stone-600"
                 >
                   ✕
                 </button>
@@ -250,7 +250,7 @@ export default function AlertsView() {
           ))}
         </div>
       )}
-      <p className="px-1 py-4 font-mono text-[11px] leading-relaxed text-zinc-600">
+      <p className="px-1 py-4 font-mono text-[11px] leading-relaxed text-stone-500">
         Rules live in this browser only — no account, nothing leaves your
         device.
       </p>

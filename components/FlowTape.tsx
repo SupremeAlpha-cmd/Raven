@@ -21,10 +21,10 @@ function shortAddr(a: string): string {
 function DirectionBadge({ d }: { d: TapeEntry["direction"] }) {
   const styles =
     d === "buy"
-      ? "bg-emerald-400/15 text-emerald-300 border-emerald-400/25"
+      ? "bg-emerald-100 text-emerald-700 border-emerald-200"
       : d === "sell"
-        ? "bg-rose-400/15 text-rose-300 border-rose-400/25"
-        : "bg-zinc-400/10 text-zinc-400 border-zinc-400/20";
+        ? "bg-rose-100 text-rose-700 border-rose-200"
+        : "bg-stone-100 text-stone-500 border-stone-200";
   return (
     <span
       className={`inline-block w-14 shrink-0 rounded-full border px-1.5 py-0.5 text-center font-mono text-[11px] font-bold uppercase ${styles}`}
@@ -35,33 +35,33 @@ function DirectionBadge({ d }: { d: TapeEntry["direction"] }) {
 }
 
 function TapeRow({ e, fresh }: { e: TapeEntry; fresh: boolean }) {
-  const accent =
+  const hover =
     e.direction === "buy"
-      ? "hover:border-emerald-400/25"
+      ? "hover:bg-emerald-50/60"
       : e.direction === "sell"
-        ? "hover:border-rose-400/25"
-        : "hover:border-white/15";
+        ? "hover:bg-rose-50/60"
+        : "hover:bg-stone-50";
   return (
     <a
       href={`${EXPLORER}/tx/${e.txHash}`}
       target="_blank"
       rel="noreferrer"
-      className={`flex items-center gap-3 border-b border-white/5 px-4 py-2.5 transition-colors hover:bg-white/[0.03] ${accent} ${
+      className={`flex items-center gap-3 border-b border-stone-200/70 px-4 py-2.5 transition-colors ${hover} ${
         fresh ? "raven-row-enter" : ""
       }`}
     >
       <DirectionBadge d={e.direction} />
       <div className="min-w-0 flex-1">
-        <div className="truncate font-mono text-[13px] text-zinc-100">
+        <div className="truncate font-mono text-[13px] text-[#1c1917]">
           {e.amountIn} {e.tokenInSymbol}
-          <span className="mx-1.5 text-zinc-600">→</span>
+          <span className="mx-1.5 text-stone-400">→</span>
           {e.amountOut} {e.tokenOutSymbol}
         </div>
-        <div className="mt-0.5 font-mono text-[11px] text-zinc-500">
+        <div className="mt-0.5 font-mono text-[11px] text-stone-500">
           {shortAddr(e.trader)}
         </div>
       </div>
-      <div className="shrink-0 font-mono text-[11px] text-zinc-500">
+      <div className="shrink-0 font-mono text-[11px] text-stone-400">
         {timeAgo(e.timestamp)}
       </div>
     </a>
@@ -74,15 +74,15 @@ function PressureBar({ entries }: { entries: TapeEntry[] }) {
   const total = buys + sells;
   const buyPct = total === 0 ? 50 : (buys / total) * 100;
   return (
-    <div className="rounded-2xl border border-white/10 bg-[#12151d] px-4 py-3">
+    <div className="rounded-3xl border border-stone-200/80 bg-white px-4 py-3 shadow-[0_2px_16px_rgba(28,25,23,0.05)]">
       <div className="flex items-center justify-between font-mono text-[11px]">
-        <span className="font-bold text-emerald-300">{buys} buys</span>
-        <span className="uppercase tracking-wider text-zinc-500">
+        <span className="font-bold text-emerald-600">{buys} buys</span>
+        <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-stone-400">
           tape pressure
         </span>
-        <span className="font-bold text-rose-300">{sells} sells</span>
+        <span className="font-bold text-rose-600">{sells} sells</span>
       </div>
-      <div className="mt-2 flex h-2 overflow-hidden rounded-full bg-white/5">
+      <div className="mt-2 flex h-2.5 overflow-hidden rounded-full bg-stone-200/60">
         <div
           className="h-full rounded-full bg-emerald-400 transition-all"
           style={{ width: `${buyPct}%` }}
@@ -152,23 +152,23 @@ export default function FlowTape({
   return (
     <div>
       <div className="flex items-center justify-between px-4 py-3">
-        <p className="font-mono text-[11px] uppercase tracking-wider text-zinc-500">
+        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-700">
           buy / sell tape
         </p>
-        <p className="font-mono text-[11px] text-zinc-600">
+        <p className="font-mono text-[11px] text-stone-400">
           refresh in {countdown}s
         </p>
       </div>
       {loading ? (
-        <p className="px-4 py-8 text-center font-mono text-sm text-zinc-500">
+        <p className="px-4 py-8 text-center font-mono text-sm text-stone-500">
           tuning the frequency…
         </p>
       ) : error ? (
-        <p className="px-4 py-8 text-center font-mono text-sm text-rose-300">
+        <p className="px-4 py-8 text-center font-mono text-sm text-rose-600">
           {error}
         </p>
       ) : entries.length === 0 ? (
-        <p className="px-4 py-8 text-center font-mono text-sm text-zinc-500">
+        <p className="px-4 py-8 text-center font-mono text-sm text-stone-500">
           quiet skies — no swaps in range
         </p>
       ) : (
@@ -176,7 +176,7 @@ export default function FlowTape({
           <div className="px-4 pb-3">
             <PressureBar entries={entries} />
           </div>
-          <div className="border-t border-white/5">
+          <div className="border-t border-stone-200/70">
             {entries.map((e) => (
               <TapeRow key={e.txHash} e={e} fresh={!seen.current.has(e.txHash)} />
             ))}

@@ -17,8 +17,8 @@ const siteUrl =
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
-  title: "Raven — what's happening on Robinhood Chain",
-  description:
+  themeColor: "#fffdf7",
+  title: "Raven — what's happening on Robinhood Chain",  description:
     "Raven watches the chain so you don't have to. Live graduations, trade flow, and wallet signals on Robinhood Chain.",
   icons: { icon: "/logo.png", apple: "/logo.png" },
   openGraph: {

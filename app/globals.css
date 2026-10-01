@@ -6,28 +6,33 @@
 }
 
 :root {
-  --raven-ink: #0b0d12;
-  --raven-panel: #12151d;
-  --raven-panel-2: #171b25;
+  --raven-paper: #fffdf7;
+  --raven-ink: #1c1917;
 }
 
 html {
-  background: var(--raven-ink);
+  background: var(--raven-paper);
 }
 
 body {
-  background: var(--raven-ink);
-  color: #f4f4f5;
+  background: var(--raven-paper);
+  color: var(--raven-ink);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
-/* Fresh tape rows slide in */
+::selection {
+  background: rgba(251, 191, 36, 0.45);
+  color: #1c1917;
+}
+
+/* Fresh tape rows slide in with a warm flash */
 @keyframes raven-row-enter {
   from {
     opacity: 0;
     transform: translateY(-6px);
-    background-color: rgba(255, 255, 255, 0.045);
+    background-color: rgba(251, 191, 36, 0.18);
   }
   to {
     opacity: 1;
