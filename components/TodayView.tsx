@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Graduation, NearGraduation } from "@/lib/graduation";
 import { SignalTag, Meter, WatchLoading, EmptyScope } from "./raven-ui";
+import TokenLookup from "./TokenLookup";
 
 const EXPLORER = "https://robinhoodchain.blockscout.com";
 const REFRESH_MS = 5 * 60_000;
@@ -199,6 +200,7 @@ export default function TodayView() {
 
   return (
     <div>
+      <TokenLookup />
       <div className="flex items-center justify-between px-4 pb-2 pt-4">
         <SignalTag tone="amber">nearing graduation // ranked by velocity</SignalTag>
         {stale && (
