@@ -1,13 +1,21 @@
 "use client";
 
 import { useState } from "react";
+import type { CSSProperties } from "react";
 import { useAlerts } from "./AlertsContext";
 import { RULE_META, type AlertRuleType } from "@/lib/alerts";
+import { SignalTag, EmptyScope } from "./raven-ui";
 
-const typeAccent: Record<AlertRuleType, string> = {
-  graduation: "bg-amber-100 text-amber-700 border-amber-200",
-  whale: "bg-emerald-100 text-emerald-700 border-emerald-200",
-  launch: "bg-violet-100 text-violet-700 border-violet-200",
+const typeSolid: Record<AlertRuleType, string> = {
+  graduation: "bg-amber-500 text-white",
+  whale: "bg-emerald-500 text-white",
+  launch: "bg-violet-500 text-white",
+};
+
+const typeSc: Record<AlertRuleType, string> = {
+  graduation: "#f59e0b",
+  whale: "#10b981",
+  launch: "#8b5cf6",
 };
 
 function timeAgo(ts: number): string {
@@ -25,13 +33,13 @@ function Toggle({ on, onClick }: { on: boolean; onClick: () => void }) {
     <button
       onClick={onClick}
       aria-label={on ? "disable rule" : "enable rule"}
-      className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
-        on ? "bg-rose-500" : "bg-stone-200"
+      className={`relative h-7 w-12 shrink-0 rounded-lg border-2 transition-colors ${
+        on ? "border-rose-600 bg-rose-500" : "border-stone-300 bg-stone-200"
       }`}
     >
       <span
-        className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${
-          on ? "left-[22px]" : "left-0.5"
+        className={`absolute top-[2px] h-[18px] w-[18px] rounded-md bg-white shadow transition-all ${
+          on ? "left-[24px]" : "left-[2px]"
         }`}
       />
     </button>
@@ -63,20 +71,25 @@ export default function AlertsView() {
     <div className="px-4 pb-10">
       {/* Notification permission */}
       {notifPerm !== "granted" && notifPerm !== "unsupported" && (
-        <div className="mt-3 flex items-center justify-between gap-3 rounded-3xl border border-rose-200 bg-rose-50 px-4 py-3">
-          <p className="text-[13px] text-rose-800">
-            Alerts live here. Want them as system notifications too?
+        <div className="mt-4 border-2 border-rose-500 bg-rose-50 px-4 py-3.5 shadow-[4px_4px_0_rgba(244,63,94,0.15)]">
+          <p className="font-mono text-[13px] font-black uppercase tracking-wide text-rose-700">
+            ▸ want a tap on the shoulder?
           </p>
-          <button
-            onClick={requestPermission}
-            className="shrink-0 rounded-full bg-rose-500 px-4 py-1.5 text-[13px] font-bold text-white transition-all hover:bg-rose-400 active:scale-[0.98]"
-          >
-            Enable
-          </button>
+          <div className="mt-2 flex items-center justify-between gap-3">
+            <p className="text-[13px] text-rose-800/80">
+              Alerts live here. Get them as system notifications too.
+            </p>
+            <button
+              onClick={requestPermission}
+              className="shrink-0 rounded-lg bg-rose-500 px-5 py-2 text-[13px] font-black text-white transition-all hover:bg-rose-400 active:scale-[0.97]"
+            >
+              ENABLE
+            </button>
+          </div>
         </div>
       )}
       {notifPerm === "denied" && (
-        <p className="mt-3 rounded-3xl border border-stone-200/80 bg-white px-4 py-3 text-[12px] text-stone-500 shadow-[0_2px_16px_rgba(28,25,23,0.05)]">
+        <p className="mt-4 border border-stone-300 bg-white px-4 py-3 font-mono text-[12px] text-stone-500">
           System notifications are blocked for this site — alerts will still
           appear in the feed below. Re-enable them in your browser's site
           settings.
@@ -84,28 +97,30 @@ export default function AlertsView() {
       )}
 
       {/* Rules */}
-      <div className="flex items-center justify-between pb-1 pt-5">
-        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-rose-700">
-          alert rules
-        </p>
-        <p className="font-mono text-[11px] text-stone-400">
-          checked every minute
-        </p>
+      <div className="flex items-center justify-between px-1 pb-2 pt-5">
+        <SignalTag tone="rose">alert rules // checked every minute</SignalTag>
       </div>
 
-      <div className="space-y-2">
+      <div className="space-y-2.5">
         {rules.map((r) => {
           const meta = RULE_META[r.type];
           return (
             <div
               key={r.id}
-              className={`rounded-3xl border border-stone-200/80 bg-white px-4 py-3 shadow-[0_2px_16px_rgba(28,25,23,0.05)] ${
-                r.enabled ? "" : "opacity-50"
+              className={`border-2 bg-white px-4 py-3 ${
+                r.enabled
+                  ? "scope-corners border-[#1c1917] shadow-[4px_4px_0_rgba(28,25,23,0.12)]"
+                  : "border-stone-200 opacity-50"
               }`}
+              style={
+                r.enabled
+                  ? ({ ["--sc" as string]: typeSc[r.type] } as CSSProperties)
+                  : undefined
+              }
             >
               <div className="flex items-center justify-between gap-3">
                 <span
-                  className={`rounded-full border px-2.5 py-0.5 font-mono text-[11px] font-bold uppercase ${typeAccent[r.type]}`}
+                  className={`rounded-md px-2.5 py-1 font-mono text-[11px] font-black uppercase tracking-wide ${typeSolid[r.type]}`}
                 >
                   {meta.label}
                 </span>
@@ -114,7 +129,7 @@ export default function AlertsView() {
                   <button
                     onClick={() => removeRule(r.id)}
                     aria-label="delete rule"
-                    className="rounded-full px-2 py-1 font-mono text-[13px] text-stone-400 hover:text-rose-600"
+                    className="rounded-md px-2 py-1 font-mono text-[13px] font-bold text-stone-400 hover:text-rose-600"
                   >
                     ✕
                   </button>
@@ -122,8 +137,8 @@ export default function AlertsView() {
               </div>
               {meta.needsThreshold && (
                 <div className="mt-2.5 flex items-center gap-2">
-                  <span className="font-mono text-[12px] text-stone-500">
-                    at / above
+                  <span className="font-mono text-[12px] font-bold text-stone-500">
+                    AT / ABOVE
                   </span>
                   <input
                     type="number"
@@ -132,7 +147,7 @@ export default function AlertsView() {
                     onChange={(e) =>
                       setThreshold(r.id, Number(e.target.value))
                     }
-                    className="w-24 rounded-lg border border-stone-300 bg-white px-2.5 py-1.5 font-mono text-[13px] text-[#1c1917] outline-none focus:border-rose-400"
+                    className="w-24 rounded-lg border-2 border-stone-300 bg-white px-2.5 py-1.5 font-mono text-[13px] font-bold text-[#1c1917] outline-none focus:border-rose-500"
                   />
                   <span className="font-mono text-[12px] text-stone-500">
                     {meta.unit}
@@ -148,10 +163,8 @@ export default function AlertsView() {
       </div>
 
       {/* Add rule */}
-      <div className="mt-3 rounded-3xl border border-dashed border-stone-300 px-4 py-3">
-        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-stone-400">
-          new rule
-        </p>
+      <div className="mt-3 border-2 border-dashed border-stone-300 px-4 py-3.5">
+        <SignalTag tone="stone">＋ new rule</SignalTag>
         <div className="mt-2.5 flex flex-wrap items-center gap-2">
           <select
             value={newType}
@@ -160,7 +173,7 @@ export default function AlertsView() {
               setNewType(t);
               setNewThreshold(String(RULE_META[t].defaultThreshold));
             }}
-            className="rounded-lg border border-stone-300 bg-white px-2.5 py-1.5 font-mono text-[13px] text-[#1c1917] outline-none"
+            className="rounded-lg border-2 border-stone-300 bg-white px-2.5 py-1.5 font-mono text-[13px] font-bold text-[#1c1917] outline-none"
           >
             {(Object.keys(RULE_META) as AlertRuleType[]).map((t) => (
               <option key={t} value={t}>
@@ -175,7 +188,7 @@ export default function AlertsView() {
               value={newThreshold}
               onChange={(e) => setNewThreshold(e.target.value)}
               aria-label="threshold"
-              className="w-24 rounded-lg border border-stone-300 bg-white px-2.5 py-1.5 font-mono text-[13px] text-[#1c1917] outline-none focus:border-rose-400"
+              className="w-24 rounded-lg border-2 border-stone-300 bg-white px-2.5 py-1.5 font-mono text-[13px] font-bold text-[#1c1917] outline-none focus:border-rose-500"
             />
           )}
           <button
@@ -183,55 +196,63 @@ export default function AlertsView() {
               addRule(newType, Number(newThreshold) || 1);
               setNewThreshold(String(RULE_META[newType].defaultThreshold));
             }}
-            className="rounded-full bg-rose-500 px-4 py-1.5 text-[13px] font-bold text-white transition-all hover:bg-rose-400 active:scale-[0.98]"
+            className="rounded-lg bg-rose-500 px-5 py-1.5 text-[13px] font-black text-white transition-all hover:bg-rose-400 active:scale-[0.97]"
           >
-            Add rule
+            ADD RULE
           </button>
         </div>
       </div>
 
       {/* Feed */}
-      <div className="flex items-center justify-between pb-1 pt-6">
-        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-rose-700">
-          fired alerts
-        </p>
+      <div className="flex items-center justify-between px-1 pb-2 pt-6">
+        <SignalTag tone="rose">fired alerts // newest first</SignalTag>
         {feed.length > 0 && (
           <button
             onClick={clearFeed}
-            className="font-mono text-[11px] text-stone-400 hover:text-stone-600"
+            className="font-mono text-[11px] font-bold text-stone-400 hover:text-stone-600"
           >
             clear all
           </button>
         )}
       </div>
       {feed.length === 0 ? (
-        <p className="rounded-3xl border border-stone-200/80 bg-white px-4 py-8 text-center font-mono text-sm text-stone-500 shadow-[0_2px_16px_rgba(28,25,23,0.05)]">
-          nothing fired yet — rules are checked every minute while this tab is
-          open
-        </p>
+        <EmptyScope
+          tone="rose"
+          message="nothing fired yet"
+          sub="rules are checked every minute while this tab is open"
+        />
       ) : (
-        <div className="space-y-2">
-          {feed.map((a) => (
+        <div className="space-y-2.5">
+          {feed.map((a, i) => (
             <div
               key={a.id}
-              className="rounded-3xl border border-stone-200/80 bg-white px-4 py-3 shadow-[0_2px_16px_rgba(28,25,23,0.05)]"
+              className={`border-2 bg-white px-4 py-3 ${
+                i === 0
+                  ? "scope-corners border-[#1c1917] shadow-[4px_4px_0_rgba(28,25,23,0.12)]"
+                  : "border-stone-200"
+              }`}
+              style={
+                i === 0
+                  ? ({ ["--sc" as string]: "#f43f5e" } as CSSProperties)
+                  : undefined
+              }
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-[14px] font-bold text-[#1c1917]">
+                  <p className="text-[15px] font-black tracking-tight text-[#1c1917]">
                     {a.title}
                   </p>
                   <p className="mt-0.5 font-mono text-[12px] text-stone-500">
                     {a.detail}
                   </p>
                   <div className="mt-1.5 flex items-center gap-3 font-mono text-[11px]">
-                    <span className="text-stone-400">{timeAgo(a.firedAt)}</span>
+                    <span className="font-bold text-stone-400">{timeAgo(a.firedAt)}</span>
                     {a.link && (
                       <a
                         href={a.link}
                         target="_blank"
                         rel="noreferrer"
-                        className="text-rose-600 hover:text-rose-500"
+                        className="font-bold text-rose-600 hover:text-rose-500"
                       >
                         view on explorer →
                       </a>
@@ -241,7 +262,7 @@ export default function AlertsView() {
                 <button
                   onClick={() => dismissAlert(a.id)}
                   aria-label="dismiss alert"
-                  className="shrink-0 rounded-full px-2 py-1 font-mono text-[13px] text-stone-400 hover:text-stone-600"
+                  className="shrink-0 rounded-md px-2 py-1 font-mono text-[13px] font-bold text-stone-400 hover:text-stone-600"
                 >
                   ✕
                 </button>

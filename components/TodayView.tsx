@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { Graduation, NearGraduation } from "@/lib/graduation";
+import { SignalTag, Meter, WatchLoading, EmptyScope } from "./raven-ui";
 
 const EXPLORER = "https://robinhoodchain.blockscout.com";
 const REFRESH_MS = 5 * 60_000;
@@ -23,25 +24,70 @@ function fmt(n: number): string {
 }
 
 /** Heat color for graduation progress: cool early, hot near the line. */
-function heat(pct: number): { bar: string; track: string; text: string } {
+function heat(pct: number): { filled: string; text: string; sc: string } {
   if (pct >= 90)
-    return { bar: "bg-rose-400", track: "bg-rose-100", text: "text-rose-600" };
+    return { filled: "bg-rose-500", text: "text-rose-600", sc: "#f43f5e" };
   if (pct >= 70)
-    return {
-      bar: "bg-orange-400",
-      track: "bg-orange-100",
-      text: "text-orange-600",
-    };
+    return { filled: "bg-orange-500", text: "text-orange-600", sc: "#f97316" };
   if (pct >= 50)
-    return { bar: "bg-amber-400", track: "bg-amber-100", text: "text-amber-700" };
-  return {
-    bar: "bg-emerald-400",
-    track: "bg-emerald-100",
-    text: "text-emerald-600",
-  };
+    return { filled: "bg-amber-500", text: "text-amber-700", sc: "#f59e0b" };
+  return { filled: "bg-emerald-500", text: "text-emerald-600", sc: "#10b981" };
 }
 
-const rankColor = ["text-amber-600", "text-stone-400", "text-orange-600"];
+function ImminentTag() {
+  return (
+    <span className="raven-blink inline-flex items-center gap-1.5 rounded-md bg-rose-500 px-2 py-0.5 font-mono text-[10px] font-black uppercase tracking-wider text-white">
+      <span className="inline-block h-1.5 w-1.5 rounded-full bg-white" />
+      graduation imminent
+    </span>
+  );
+}
+
+/** The #1 token — in the crosshairs. */
+function CrosshairCard({ t }: { t: NearGraduation }) {
+  const pct = Math.min(100, t.progress * 100);
+  const h = heat(pct);
+  return (
+    <a
+      href={`${EXPLORER}/token/${t.token}`}
+      target="_blank"
+      rel="noreferrer"
+      className="scope-corners block border-2 border-[#1c1917] bg-white p-4 shadow-[4px_4px_0_rgba(28,25,23,0.12)] transition-transform active:scale-[0.99]"
+      style={{ ["--sc" as string]: h.sc }}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <p className="font-mono text-[10px] font-black uppercase tracking-widest text-stone-500">
+          ▸ in the crosshairs
+        </p>
+        {pct >= 90 && <ImminentTag />}
+      </div>
+      <div className="mt-2 flex items-baseline justify-between gap-2">
+        <span className="truncate font-mono text-2xl font-black tracking-tight text-[#1c1917]">
+          ${t.symbol}
+        </span>
+        <span className={`shrink-0 font-mono text-3xl font-black ${h.text}`}>
+          {pct.toFixed(0)}
+          <span className="text-lg">%</span>
+        </span>
+      </div>
+      <Meter
+        pct={pct}
+        segments={28}
+        filled={h.filled}
+        className="mt-3 h-4"
+        label={`${t.symbol} graduation progress ${pct.toFixed(1)} percent`}
+      />
+      <div className="mt-2.5 flex justify-between font-mono text-[11px] font-bold text-stone-500">
+        <span>
+          {fmt(t.raised)} / {fmt(t.threshold)} USDG
+        </span>
+        <span>
+          24h <span className="text-stone-800">+{fmt(t.velocity24h)}</span> velocity
+        </span>
+      </div>
+    </a>
+  );
+}
 
 function NearRow({ t, rank }: { t: NearGraduation; rank: number }) {
   const pct = Math.min(100, t.progress * 100);
@@ -51,30 +97,30 @@ function NearRow({ t, rank }: { t: NearGraduation; rank: number }) {
       href={`${EXPLORER}/token/${t.token}`}
       target="_blank"
       rel="noreferrer"
-      className="flex gap-3 border-b border-stone-200/70 px-4 py-3.5 transition-colors hover:bg-amber-50/60"
+      className="flex gap-3 border-b border-stone-200/70 px-4 py-3.5 transition-colors hover:bg-amber-50/70"
     >
-      <span
-        className={`w-6 shrink-0 pt-0.5 font-mono text-[13px] font-bold ${
-          rankColor[rank] ?? "text-stone-400"
-        }`}
-      >
+      <span className="w-7 shrink-0 pt-0.5 text-center font-mono text-[13px] font-black text-stone-400">
         {rank + 1}
       </span>
       <div className="min-w-0 flex-1">
-        <div className="flex items-baseline justify-between gap-2">
-          <span className="truncate font-mono text-[14px] font-bold text-[#1c1917]">
+        <div className="flex items-center justify-between gap-2">
+          <span className="truncate font-mono text-[15px] font-black text-[#1c1917]">
             ${t.symbol}
           </span>
-          <span className={`shrink-0 font-mono text-[12px] font-bold ${h.text}`}>
-            {pct.toFixed(1)}%
+          <span className="flex shrink-0 items-center gap-2">
+            {pct >= 90 && <ImminentTag />}
+            <span className={`font-mono text-[14px] font-black ${h.text}`}>
+              {pct.toFixed(1)}%
+            </span>
           </span>
         </div>
-        <div className={`mt-2 h-2.5 overflow-hidden rounded-full ${h.track}`}>
-          <div
-            className={`h-full rounded-full ${h.bar} transition-all`}
-            style={{ width: `${pct}%` }}
-          />
-        </div>
+        <Meter
+          pct={pct}
+          segments={24}
+          filled={h.filled}
+          className="mt-2 h-2.5"
+          label={`${t.symbol} graduation progress ${pct.toFixed(1)} percent`}
+        />
         <div className="mt-1.5 flex justify-between font-mono text-[11px] text-stone-500">
           <span>
             {fmt(t.raised)} / {fmt(t.threshold)} USDG
@@ -94,11 +140,15 @@ function GradRow({ g }: { g: Graduation }) {
       href={`${EXPLORER}/token/${g.token}`}
       target="_blank"
       rel="noreferrer"
-      className="flex items-center justify-between gap-3 border-b border-stone-200/70 px-4 py-2.5 transition-colors hover:bg-emerald-50/60"
+      className="flex items-center justify-between gap-3 border-b border-stone-200/70 px-4 py-2.5 transition-colors hover:bg-emerald-50/70"
     >
-      <span className="flex items-center gap-2 font-mono text-[13px] font-semibold text-[#1c1917]">
-        <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
-        ${g.symbol}
+      <span className="flex items-center gap-2">
+        <span className="rounded-md bg-emerald-500 px-1.5 py-0.5 font-mono text-[10px] font-black text-white">
+          ✓
+        </span>
+        <span className="font-mono text-[13px] font-black text-[#1c1917]">
+          ${g.symbol}
+        </span>
       </span>
       <span className="shrink-0 font-mono text-[11px] text-stone-500">
         seeded {fmt(g.pairAmount)} {g.pair} · {timeAgo(g.timestamp)}
@@ -134,50 +184,48 @@ export default function TodayView() {
     return () => clearInterval(id);
   }, [load]);
 
-  if (loading) {
-    return (
-      <p className="px-4 py-16 text-center font-mono text-sm text-stone-500">
-        scanning the curves…
-      </p>
-    );
-  }
+  if (loading) return <WatchLoading tone="amber" message="scanning the curves" />;
   if (error) {
     return (
-      <p className="px-4 py-16 text-center font-mono text-sm text-rose-600">
-        {error}
+      <p className="px-4 py-16 text-center font-mono text-sm font-bold text-rose-600">
+        SCOPE DOWN — {error}
       </p>
     );
   }
+
+  const [leader, ...rest] = nearing;
 
   return (
     <div>
-      <div className="flex items-center justify-between px-4 pb-1 pt-3">
-        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-amber-700">
-          nearing graduation
-        </p>
-        <p className="font-mono text-[11px] text-amber-700/80">
-          ranked by velocity
-        </p>
+      <div className="flex items-center justify-between px-4 pb-2 pt-4">
+        <SignalTag tone="amber">nearing graduation // ranked by velocity</SignalTag>
       </div>
       {nearing.length === 0 ? (
-        <p className="px-4 py-6 font-mono text-sm text-stone-400">
-          no active curves in range
-        </p>
+        <EmptyScope
+          tone="amber"
+          message="nothing on the scope"
+          sub="no active curves in range"
+        />
       ) : (
-        <div className="border-t border-stone-200/70">
-          {nearing.map((t, i) => (
-            <NearRow key={t.token} t={t} rank={i} />
-          ))}
-        </div>
+        <>
+          <div className="px-4 pb-2">
+            <CrosshairCard t={leader} />
+          </div>
+          {rest.length > 0 && (
+            <div className="border-t-2 border-[#1c1917]/10">
+              {rest.map((t, i) => (
+                <NearRow key={t.token} t={t} rank={i + 1} />
+              ))}
+            </div>
+          )}
+        </>
       )}
 
-      <div className="px-4 pb-1 pt-6">
-        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-700">
-          recently graduated
-        </p>
+      <div className="px-4 pb-2 pt-6">
+        <SignalTag tone="emerald">graduated // seeded on-chain</SignalTag>
       </div>
       {graduated.length === 0 ? (
-        <p className="px-4 py-6 font-mono text-sm text-stone-400">
+        <p className="px-4 py-4 font-mono text-[12px] text-stone-400">
           no graduations in range
         </p>
       ) : (

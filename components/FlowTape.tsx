@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { TapeEntry } from "@/lib/tape";
+import { SignalTag, TugMeter, WatchLoading, EmptyScope } from "./raven-ui";
 
 const REFRESH_MS = 30_000;
 const EXPLORER = "https://robinhoodchain.blockscout.com";
@@ -18,18 +19,18 @@ function shortAddr(a: string): string {
   return a.slice(0, 6) + "…" + a.slice(-4);
 }
 
-function DirectionBadge({ d }: { d: TapeEntry["direction"] }) {
+function DirectionTag({ d }: { d: TapeEntry["direction"] }) {
   const styles =
     d === "buy"
-      ? "bg-emerald-100 text-emerald-700 border-emerald-200"
+      ? "bg-emerald-500 text-white"
       : d === "sell"
-        ? "bg-rose-100 text-rose-700 border-rose-200"
-        : "bg-stone-100 text-stone-500 border-stone-200";
+        ? "bg-rose-500 text-white"
+        : "bg-stone-300 text-stone-600";
   return (
     <span
-      className={`inline-block w-14 shrink-0 rounded-full border px-1.5 py-0.5 text-center font-mono text-[11px] font-bold uppercase ${styles}`}
+      className={`inline-block w-16 shrink-0 rounded-md px-1.5 py-1 text-center font-mono text-[11px] font-black uppercase tracking-wide ${styles}`}
     >
-      {d}
+      {d === "buy" ? "▲ buy" : d === "sell" ? "▼ sell" : d}
     </span>
   );
 }
@@ -37,9 +38,9 @@ function DirectionBadge({ d }: { d: TapeEntry["direction"] }) {
 function TapeRow({ e, fresh }: { e: TapeEntry; fresh: boolean }) {
   const hover =
     e.direction === "buy"
-      ? "hover:bg-emerald-50/60"
+      ? "hover:bg-emerald-50"
       : e.direction === "sell"
-        ? "hover:bg-rose-50/60"
+        ? "hover:bg-rose-50"
         : "hover:bg-stone-50";
   return (
     <a
@@ -50,9 +51,9 @@ function TapeRow({ e, fresh }: { e: TapeEntry; fresh: boolean }) {
         fresh ? "raven-row-enter" : ""
       }`}
     >
-      <DirectionBadge d={e.direction} />
+      <DirectionTag d={e.direction} />
       <div className="min-w-0 flex-1">
-        <div className="truncate font-mono text-[13px] text-[#1c1917]">
+        <div className="truncate font-mono text-[13px] font-bold text-[#1c1917]">
           {e.amountIn} {e.tokenInSymbol}
           <span className="mx-1.5 text-stone-400">→</span>
           {e.amountOut} {e.tokenOutSymbol}
@@ -61,37 +62,52 @@ function TapeRow({ e, fresh }: { e: TapeEntry; fresh: boolean }) {
           {shortAddr(e.trader)}
         </div>
       </div>
-      <div className="shrink-0 font-mono text-[11px] text-stone-400">
+      <div className="shrink-0 font-mono text-[11px] font-bold text-stone-400">
         {timeAgo(e.timestamp)}
       </div>
     </a>
   );
 }
 
-function PressureBar({ entries }: { entries: TapeEntry[] }) {
+function PressurePanel({ entries }: { entries: TapeEntry[] }) {
   const buys = entries.filter((e) => e.direction === "buy").length;
   const sells = entries.filter((e) => e.direction === "sell").length;
   const total = buys + sells;
   const buyPct = total === 0 ? 50 : (buys / total) * 100;
+  const verdict =
+    buys - sells >= 5 ? (
+      <span className="font-black text-emerald-600">▲ BUYERS IN CONTROL</span>
+    ) : sells - buys >= 5 ? (
+      <span className="font-black text-rose-600">▼ SELLERS IN CONTROL</span>
+    ) : (
+      <span className="font-black text-stone-500">■ DEAD EVEN</span>
+    );
   return (
-    <div className="rounded-3xl border border-stone-200/80 bg-white px-4 py-3 shadow-[0_2px_16px_rgba(28,25,23,0.05)]">
-      <div className="flex items-center justify-between font-mono text-[11px]">
-        <span className="font-bold text-emerald-600">{buys} buys</span>
-        <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-stone-400">
-          tape pressure
-        </span>
-        <span className="font-bold text-rose-600">{sells} sells</span>
+    <div className="border-2 border-[#1c1917] bg-white px-4 py-3.5 shadow-[4px_4px_0_rgba(28,25,23,0.12)]">
+      <div className="flex items-end justify-between">
+        <div>
+          <p className="font-mono text-3xl font-black text-emerald-600">{buys}</p>
+          <p className="font-mono text-[10px] font-black uppercase tracking-widest text-emerald-700">
+            buys
+          </p>
+        </div>
+        <p className="pb-1 text-center font-mono text-[11px]">{verdict}</p>
+        <div className="text-right">
+          <p className="font-mono text-3xl font-black text-rose-600">{sells}</p>
+          <p className="font-mono text-[10px] font-black uppercase tracking-widest text-rose-700">
+            sells
+          </p>
+        </div>
       </div>
-      <div className="mt-2 flex h-2.5 overflow-hidden rounded-full bg-stone-200/60">
-        <div
-          className="h-full rounded-full bg-emerald-400 transition-all"
-          style={{ width: `${buyPct}%` }}
-        />
-        <div
-          className="h-full rounded-full bg-rose-400 transition-all"
-          style={{ width: `${100 - buyPct}%` }}
-        />
-      </div>
+      <TugMeter
+        leftPct={buyPct}
+        segments={28}
+        className="mt-3 h-3.5"
+        label={`tape pressure: ${buys} buys vs ${sells} sells`}
+      />
+      <p className="mt-2 text-center font-mono text-[10px] font-bold uppercase tracking-widest text-stone-400">
+        ▸ tape pressure // last {total} swaps
+      </p>
     </div>
   );
 }
@@ -151,32 +167,30 @@ export default function FlowTape({
 
   return (
     <div>
-      <div className="flex items-center justify-between px-4 py-3">
-        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-700">
-          buy / sell tape
-        </p>
-        <p className="font-mono text-[11px] text-stone-400">
+      <div className="flex items-center justify-between px-4 pb-2 pt-4">
+        <SignalTag tone="emerald">buy / sell tape // live</SignalTag>
+        <p className="font-mono text-[11px] font-bold text-stone-400">
           refresh in {countdown}s
         </p>
       </div>
       {loading ? (
-        <p className="px-4 py-8 text-center font-mono text-sm text-stone-500">
-          tuning the frequency…
-        </p>
+        <WatchLoading tone="emerald" message="tuning the frequency" />
       ) : error ? (
-        <p className="px-4 py-8 text-center font-mono text-sm text-rose-600">
-          {error}
+        <p className="px-4 py-16 text-center font-mono text-sm font-bold text-rose-600">
+          SCOPE DOWN — {error}
         </p>
       ) : entries.length === 0 ? (
-        <p className="px-4 py-8 text-center font-mono text-sm text-stone-500">
-          quiet skies — no swaps in range
-        </p>
+        <EmptyScope
+          tone="emerald"
+          message="quiet skies"
+          sub="no swaps in range"
+        />
       ) : (
         <>
           <div className="px-4 pb-3">
-            <PressureBar entries={entries} />
+            <PressurePanel entries={entries} />
           </div>
-          <div className="border-t border-stone-200/70">
+          <div className="border-t-2 border-[#1c1917]/10">
             {entries.map((e) => (
               <TapeRow key={e.txHash} e={e} fresh={!seen.current.has(e.txHash)} />
             ))}

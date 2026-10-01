@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { WalletStats } from "@/lib/wallets";
+import { SignalTag, WatchLoading, EmptyScope } from "./raven-ui";
 
 const EXPLORER = "https://robinhoodchain.blockscout.com";
 
@@ -24,51 +25,77 @@ function timeAgo(ts: number): string {
   return `${Math.floor(m / 60)}h ago`;
 }
 
-const rankColor = ["text-amber-600", "text-stone-400", "text-orange-600"];
+/** Segmented buy/sell split meter for a wallet. */
+function SplitMeter({ buys, sells }: { buys: number; sells: number }) {
+  const total = buys + sells;
+  const buyPct = total === 0 ? 50 : (buys / total) * 100;
+  const n = Math.round((buyPct / 100) * 12);
+  return (
+    <div
+      className="flex gap-[2px]"
+      role="img"
+      aria-label={`${buys} buys, ${sells} sells`}
+    >
+      {Array.from({ length: 12 }, (_, i) => (
+        <div
+          key={i}
+          className={`h-2 w-2 rounded-[2px] ${i < n ? "bg-emerald-500" : "bg-rose-500"}`}
+        />
+      ))}
+    </div>
+  );
+}
 
 function WalletRow({ w, rank }: { w: WalletStats; rank: number }) {
-  const total = w.buys + w.sells;
-  const buyPct = total === 0 ? 50 : (w.buys / total) * 100;
+  const top3 = rank < 3;
   return (
     <a
-      key={w.address}
       href={`${EXPLORER}/address/${w.address}`}
       target="_blank"
       rel="noreferrer"
-      className="flex items-center gap-3 border-b border-stone-200/70 px-4 py-3 transition-colors hover:bg-violet-50/60"
+      className={`flex items-center gap-3 border-b border-stone-200/70 px-4 py-3 transition-colors ${
+        top3 ? "bg-violet-50/60 hover:bg-violet-50" : "hover:bg-stone-50"
+      }`}
     >
       <span
-        className={`w-6 shrink-0 font-mono text-[12px] font-bold ${
-          rankColor[rank] ?? "text-stone-400"
+        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg font-mono text-[13px] font-black ${
+          top3 ? "bg-violet-500 text-white" : "bg-stone-200/70 text-stone-500"
         }`}
       >
         {rank + 1}
       </span>
       <div className="min-w-0 flex-1">
-        <div className="font-mono text-[13px] font-semibold text-[#1c1917]">
-          {shortAddr(w.address)}
+        <div className="flex items-center gap-2">
+          <span className="truncate font-mono text-[14px] font-black text-[#1c1917]">
+            {shortAddr(w.address)}
+          </span>
+          {top3 && (
+            <span className="shrink-0 rounded-md bg-violet-500 px-1.5 py-0.5 font-mono text-[9px] font-black uppercase tracking-wider text-white">
+              top 3
+            </span>
+          )}
         </div>
-        <div className="mt-1 flex items-center gap-2">
-          <div className="flex h-1.5 w-16 overflow-hidden rounded-full bg-stone-200/60">
-            <div
-              className="h-full bg-emerald-400"
-              style={{ width: `${buyPct}%` }}
-            />
-            <div className="h-full bg-rose-400" style={{ width: `${100 - buyPct}%` }} />
-          </div>
-          <span className="font-mono text-[11px] text-stone-500">
+        <div className="mt-1.5 flex items-center gap-2.5">
+          <SplitMeter buys={w.buys} sells={w.sells} />
+          <span className="truncate font-mono text-[11px] text-stone-500">
             {w.trades} trades ·{" "}
-            <span className="text-emerald-600">{w.buys}B</span> /{" "}
-            <span className="text-rose-600">{w.sells}S</span> · {w.topToken} ·{" "}
+            <span className="font-bold text-emerald-600">{w.buys}B</span> /{" "}
+            <span className="font-bold text-rose-600">{w.sells}S</span> · {w.topToken} ·{" "}
             {timeAgo(w.lastActive)}
           </span>
         </div>
       </div>
       <div className="shrink-0 text-right">
-        <div className="font-mono text-[13px] font-bold text-violet-700">
+        <div
+          className={`font-mono font-black ${
+            top3 ? "text-xl text-violet-700" : "text-[15px] text-[#1c1917]"
+          }`}
+        >
           {formatVolume(w.quoteVolume)}
         </div>
-        <div className="font-mono text-[10px] text-stone-400">volume</div>
+        <div className="font-mono text-[10px] font-bold uppercase tracking-wider text-stone-400">
+          volume
+        </div>
       </div>
     </a>
   );
@@ -107,28 +134,26 @@ export default function WalletsView({
 
   return (
     <div>
-      <div className="flex items-center justify-between px-4 py-3">
-        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-violet-700">
-          most active wallets
-        </p>
-        <p className="font-mono text-[11px] text-violet-700/80">
-          {tradersSeen} traders tracked
+      <div className="flex items-center justify-between px-4 pb-2 pt-4">
+        <SignalTag tone="violet">most active wallets // tracked live</SignalTag>
+        <p className="font-mono text-[11px] font-bold text-violet-700">
+          {tradersSeen} traders
         </p>
       </div>
       {loading ? (
-        <p className="px-4 py-8 text-center font-mono text-sm text-stone-500">
-          reading the room…
-        </p>
+        <WatchLoading tone="violet" message="reading the room" />
       ) : error ? (
-        <p className="px-4 py-8 text-center font-mono text-sm text-rose-600">
-          {error}
+        <p className="px-4 py-16 text-center font-mono text-sm font-bold text-rose-600">
+          SCOPE DOWN — {error}
         </p>
       ) : wallets.length === 0 ? (
-        <p className="px-4 py-8 text-center font-mono text-sm text-stone-500">
-          no wallets in range
-        </p>
+        <EmptyScope
+          tone="violet"
+          message="no wallets on the scope"
+          sub="no wallets in range"
+        />
       ) : (
-        <div className="border-t border-stone-200/70">
+        <div className="border-t-2 border-[#1c1917]/10">
           {wallets.map((w, i) => (
             <WalletRow key={w.address} w={w} rank={i} />
           ))}
