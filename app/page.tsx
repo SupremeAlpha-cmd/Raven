@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { CSSProperties } from "react";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const views = [
   {
@@ -61,9 +62,9 @@ const accentStyles = {
 
 export default function Landing() {
   return (
-    <div className="min-h-screen bg-[#fffdf7] text-[#1c1917]">
+    <div className="min-h-screen bg-(--raven-paper) text-(--raven-ink)">
       {/* Nav */}
-      <nav className="border-b-2 border-[#1c1917]">
+      <nav className="border-b-2 border-(--raven-ink)">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-5 py-4">
           <div className="flex items-center gap-2.5">
             <img
@@ -73,12 +74,15 @@ export default function Landing() {
             />
             <span className="text-xl font-black tracking-tight">RAVEN</span>
           </div>
-          <Link
-            href="/terminal"
-            className="rounded-lg bg-[#1c1917] px-5 py-2.5 text-sm font-black text-white transition-all hover:bg-stone-800 active:scale-[0.97]"
-          >
-            OPEN TERMINAL
-          </Link>
+          <div className="flex items-center gap-2.5">
+            <ThemeToggle />
+            <Link
+              href="/terminal"
+              className="rounded-lg bg-(--raven-ink) px-5 py-2.5 text-sm font-black text-(--raven-paper) transition-all hover:opacity-90 active:scale-[0.97]"
+            >
+              OPEN TERMINAL
+            </Link>
+          </div>
         </div>
       </nav>
 
@@ -86,7 +90,7 @@ export default function Landing() {
       <header className="relative overflow-hidden">
         <div
           aria-hidden="true"
-          className="absolute inset-0 bg-gradient-to-br from-amber-200/70 via-rose-200/50 to-violet-200/70"
+          className="absolute inset-0 bg-gradient-to-br from-amber-200/70 via-rose-200/50 to-violet-200/70 dark:from-amber-500/25 dark:via-rose-500/15 dark:to-violet-500/25"
         />
         <div
           aria-hidden="true"
@@ -98,7 +102,7 @@ export default function Landing() {
               aria-hidden="true"
               className="raven-sweep absolute -inset-4 rounded-full"
             />
-            <div className="absolute inset-0 rounded-[2rem] bg-[#0b0d12] p-1 shadow-[0_12px_32px_rgba(28,25,23,0.35)]">
+            <div className="absolute inset-0 rounded-[2rem] bg-[#0b0d12] p-1 shadow-[0_12px_32px_rgba(var(--raven-shadow),0.35)]">
               <img
                 src="/logo.png"
                 alt="Raven eye"
@@ -106,8 +110,8 @@ export default function Landing() {
               />
             </div>
           </div>
-          <p className="mt-8 font-mono text-[12px] font-black uppercase tracking-widest text-stone-700">
-            <span aria-hidden="true" className="mr-1.5 text-amber-600">
+          <p className="mt-8 font-mono text-[12px] font-black uppercase tracking-widest text-(--raven-muted)">
+            <span aria-hidden="true" className="mr-1.5 text-amber-600 dark:text-amber-400">
               ▸
             </span>
             Robinhood Chain // live terminal
@@ -118,27 +122,19 @@ export default function Landing() {
               never closes.
             </span>
           </h1>
-          <p className="mx-auto mt-6 max-w-xl text-base font-medium leading-relaxed text-stone-700 md:text-lg">
+          <p className="mx-auto mt-6 max-w-xl text-base font-medium leading-relaxed text-(--raven-muted) md:text-lg">
             Raven keeps watch over Robinhood Chain — graduations, live trade
             flow, and wallet signals, all on one screen.
           </p>
           <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
             <Link
               href="/terminal"
-              className="w-full rounded-lg bg-[#1c1917] px-8 py-4 text-[15px] font-black text-white shadow-[4px_4px_0_rgba(28,25,23,0.25)] transition-all hover:bg-stone-800 active:translate-x-[2px] active:translate-y-[2px] active:shadow-none sm:w-auto"
+              className="w-full rounded-lg bg-(--raven-ink) px-8 py-4 text-[15px] font-black text-(--raven-paper) shadow-[4px_4px_0_rgba(var(--raven-shadow),0.25)] transition-all hover:opacity-90 active:translate-x-[2px] active:translate-y-[2px] active:shadow-none sm:w-auto"
             >
               OPEN THE TERMINAL →
             </Link>
-            <a
-              href="https://github.com/SupremeAlpha-cmd/Raven"
-              target="_blank"
-              rel="noreferrer"
-              className="w-full rounded-lg border-2 border-[#1c1917] bg-white/70 px-8 py-[14px] text-[15px] font-black text-[#1c1917] transition-all hover:bg-white active:scale-[0.98] sm:w-auto"
-            >
-              GITHUB
-            </a>
           </div>
-          <p className="mt-6 font-mono text-[11px] font-bold text-stone-600">
+          <p className="mt-6 font-mono text-[11px] font-bold text-(--raven-muted)">
             no wallet · no signup · reads straight from public RPC
           </p>
         </div>
@@ -146,8 +142,8 @@ export default function Landing() {
 
       {/* Views — watch stations */}
       <section className="mx-auto max-w-5xl px-5 py-14">
-        <p className="font-mono text-[12px] font-black uppercase tracking-widest text-stone-700">
-          <span aria-hidden="true" className="mr-1.5 text-amber-600">
+        <p className="font-mono text-[12px] font-black uppercase tracking-widest text-(--raven-muted)">
+          <span aria-hidden="true" className="mr-1.5 text-amber-600 dark:text-amber-400">
             ▸
           </span>
           four watch stations
@@ -159,7 +155,7 @@ export default function Landing() {
               <Link
                 key={v.name}
                 href="/terminal"
-                className={`scope-corners group border-2 border-[#1c1917] border-l-8 bg-white p-6 shadow-[4px_4px_0_rgba(28,25,23,0.12)] transition-all hover:-translate-y-1 ${a.edge} ${a.hover}`}
+                className={`scope-corners group border-2 border-(--raven-ink) border-l-8 bg-(--raven-card) p-6 shadow-[4px_4px_0_rgba(var(--raven-shadow),0.12)] transition-all hover:-translate-y-1 ${a.edge} ${a.hover}`}
                 style={{ ["--sc" as string]: a.sc } as CSSProperties}
               >
                 <div className="flex items-start justify-between">
@@ -168,17 +164,17 @@ export default function Landing() {
                   >
                     {v.num}
                   </span>
-                  <span className="font-mono text-[11px] font-bold uppercase tracking-widest text-stone-400">
+                  <span className="font-mono text-[11px] font-bold uppercase tracking-widest text-(--raven-faint)">
                     {v.tag}
                   </span>
                 </div>
                 <h2 className="mt-4 text-3xl font-black tracking-tight">
                   {v.name}
                 </h2>
-                <p className="mt-2 text-[15px] leading-relaxed text-stone-600">
+                <p className="mt-2 text-[15px] leading-relaxed text-(--raven-muted)">
                   {v.desc}
                 </p>
-                <p className="mt-5 font-mono text-[13px] font-black text-[#1c1917] transition-transform group-hover:translate-x-1">
+                <p className="mt-5 font-mono text-[13px] font-black text-(--raven-ink) transition-transform group-hover:translate-x-1">
                   ENTER →
                 </p>
               </Link>
@@ -188,10 +184,10 @@ export default function Landing() {
       </section>
 
       {/* Field manual */}
-      <section className="dot-grid border-y-2 border-[#1c1917] bg-white/60">
+      <section className="dot-grid border-y-2 border-(--raven-ink) bg-(--raven-card)/60">
         <div className="mx-auto max-w-5xl px-5 py-14">
-          <p className="text-center font-mono text-[12px] font-black uppercase tracking-widest text-stone-700">
-            <span aria-hidden="true" className="mr-1.5 text-emerald-600">
+          <p className="text-center font-mono text-[12px] font-black uppercase tracking-widest text-(--raven-muted)">
+            <span aria-hidden="true" className="mr-1.5 text-emerald-600 dark:text-emerald-400">
               ▸
             </span>
             field manual
@@ -222,7 +218,7 @@ export default function Landing() {
             ].map((s) => (
               <div
                 key={s.n}
-                className="border-2 border-[#1c1917] bg-white p-6 shadow-[4px_4px_0_rgba(28,25,23,0.12)]"
+                className="border-2 border-(--raven-ink) bg-(--raven-card) p-6 shadow-[4px_4px_0_rgba(var(--raven-shadow),0.12)]"
               >
                 <span
                   className={`inline-block rounded-md ${s.c} px-2.5 py-1 font-mono text-[13px] font-black text-white`}
@@ -232,7 +228,7 @@ export default function Landing() {
                 <h3 className="mt-3 text-xl font-black tracking-tight">
                   {s.t}
                 </h3>
-                <p className="mt-2 text-sm leading-relaxed text-stone-600">
+                <p className="mt-2 text-sm leading-relaxed text-(--raven-muted)">
                   {s.d}
                 </p>
               </div>
@@ -243,7 +239,7 @@ export default function Landing() {
 
       {/* Night watch CTA */}
       <section className="px-5 py-14">
-        <div className="mx-auto max-w-4xl border-2 border-[#1c1917] bg-[#141210] px-7 py-12 text-center shadow-[6px_6px_0_rgba(28,25,23,0.2)] sm:px-12">
+        <div className="mx-auto max-w-4xl border-2 border-(--raven-ink) bg-[#141210] px-7 py-12 text-center shadow-[6px_6px_0_rgba(var(--raven-shadow),0.2)] sm:px-12">
           <img
             src="/logo.png"
             alt=""
@@ -276,7 +272,7 @@ export default function Landing() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t-2 border-[#1c1917]">
+      <footer className="border-t-2 border-(--raven-ink)">
         <div className="mx-auto flex max-w-5xl flex-col items-center justify-between gap-3 px-5 py-8 text-center md:flex-row md:text-left">
           <div className="flex items-center gap-2">
             <img
@@ -286,9 +282,19 @@ export default function Landing() {
             />
             <span className="text-base font-black tracking-tight">RAVEN</span>
           </div>
-          <p className="font-mono text-[11px] font-bold text-stone-500">
-            built on Robinhood Chain · data from public RPC
-          </p>
+          <div className="flex flex-col items-center gap-2 md:items-end">
+            <p className="font-mono text-[11px] font-bold text-(--raven-muted)">
+              built on Robinhood Chain · data from public RPC
+            </p>
+            <a
+              href="https://github.com/SupremeAlpha-cmd/Raven"
+              target="_blank"
+              rel="noreferrer"
+              className="font-mono text-[11px] font-black uppercase tracking-widest text-(--raven-muted) underline decoration-amber-400 decoration-2 underline-offset-4 transition-colors hover:text-(--raven-ink)"
+            >
+              GitHub ↗
+            </a>
+          </div>
         </div>
       </footer>
     </div>

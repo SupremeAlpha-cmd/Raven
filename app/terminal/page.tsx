@@ -7,6 +7,7 @@ import TodayView from "@/components/TodayView";
 import WalletsView from "@/components/WalletsView";
 import AlertsView from "@/components/AlertsView";
 import { AlertsProvider, useAlerts } from "@/components/AlertsContext";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 type Tab = "today" | "flow" | "wallets" | "alerts";
 
@@ -14,25 +15,25 @@ const tabs: { id: Tab; label: string; active: string; sc: string }[] = [
   {
     id: "today",
     label: "Today",
-    active: "bg-amber-500 text-white shadow-[2px_2px_0_rgba(28,25,23,0.25)]",
+    active: "bg-amber-500 text-white shadow-[2px_2px_0_rgba(var(--raven-shadow),0.25)]",
     sc: "#f59e0b",
   },
   {
     id: "flow",
     label: "Flow",
-    active: "bg-emerald-500 text-white shadow-[2px_2px_0_rgba(28,25,23,0.25)]",
+    active: "bg-emerald-500 text-white shadow-[2px_2px_0_rgba(var(--raven-shadow),0.25)]",
     sc: "#10b981",
   },
   {
     id: "wallets",
     label: "Wallets",
-    active: "bg-violet-500 text-white shadow-[2px_2px_0_rgba(28,25,23,0.25)]",
+    active: "bg-violet-500 text-white shadow-[2px_2px_0_rgba(var(--raven-shadow),0.25)]",
     sc: "#8b5cf6",
   },
   {
     id: "alerts",
     label: "Alerts",
-    active: "bg-rose-500 text-white shadow-[2px_2px_0_rgba(28,25,23,0.25)]",
+    active: "bg-rose-500 text-white shadow-[2px_2px_0_rgba(var(--raven-shadow),0.25)]",
     sc: "#f43f5e",
   },
 ];
@@ -41,7 +42,7 @@ function AlertBadge() {
   const { unread } = useAlerts();
   if (unread === 0) return null;
   return (
-    <span className="ml-1 rounded-md bg-white/25 px-1.5 py-0.5 font-mono text-[10px] font-bold text-white">
+    <span className="ml-1 rounded-md bg-(--raven-card)/25 px-1.5 py-0.5 font-mono text-[10px] font-bold text-white">
       {unread > 99 ? "99+" : unread}
     </span>
   );
@@ -60,9 +61,9 @@ function Terminal() {
   const active = tabs.find((t) => t.id === tab)!;
 
   return (
-    <div className="min-h-screen bg-[#fffdf7] text-[#1c1917]">
+    <div className="min-h-screen bg-(--raven-paper) text-(--raven-ink)">
       {/* Watch console header */}
-      <header className="border-b-2 border-[#1c1917] bg-[#fffdf7]">
+      <header className="border-b-2 border-(--raven-ink) bg-(--raven-paper)">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-4">
           <Link href="/" className="flex items-center gap-3">
             <span
@@ -77,7 +78,7 @@ function Terminal() {
             </span>
             <div>
               <h1 className="text-xl font-black tracking-tight">RAVEN</h1>
-              <p className="font-mono text-[10px] font-bold text-stone-500">
+              <p className="font-mono text-[10px] font-bold text-(--raven-muted)">
                 ROBINHOOD CHAIN // LIVE TERMINAL
               </p>
             </div>
@@ -85,20 +86,23 @@ function Terminal() {
           <div className="text-right">
             <div className="flex items-center justify-end gap-1.5">
               <span className="raven-live-dot inline-block h-2 w-2 rounded-full bg-emerald-500" />
-              <span className="font-mono text-[12px] font-black text-emerald-600">
+              <span className="font-mono text-[12px] font-black text-emerald-600 dark:text-emerald-400">
                 ◉ LIVE
               </span>
             </div>
             {latestBlock !== null && (
-              <div className="mt-0.5 font-mono text-[11px] font-bold text-stone-500">
+              <div className="mt-0.5 font-mono text-[11px] font-bold text-(--raven-muted)">
                 BLK {latestBlock.toLocaleString()}
               </div>
             )}
+            <div className="mt-2 flex justify-end">
+              <ThemeToggle />
+            </div>
           </div>
         </div>
         {/* Tabs */}
         <nav className="mx-auto max-w-3xl px-4 pb-3">
-          <div className="flex gap-1.5 rounded-xl border-2 border-[#1c1917] bg-white p-1.5 shadow-[3px_3px_0_rgba(28,25,23,0.12)]">
+          <div className="flex gap-1.5 rounded-xl border-2 border-(--raven-ink) bg-(--raven-card) p-1.5 shadow-[3px_3px_0_rgba(var(--raven-shadow),0.12)]">
             {tabs.map((t) => (
               <button
                 key={t.id}
@@ -106,7 +110,7 @@ function Terminal() {
                 className={`flex flex-1 items-center justify-center gap-1 rounded-lg px-3 py-2.5 text-sm font-black transition-all active:scale-[0.97] ${
                   tab === t.id
                     ? t.active
-                    : "text-stone-500 hover:bg-stone-100 hover:text-stone-800"
+                    : "text-(--raven-muted) hover:bg-(--raven-soft) hover:text-(--raven-ink)"
                 }`}
               >
                 {t.label}

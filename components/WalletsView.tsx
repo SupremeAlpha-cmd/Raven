@@ -53,20 +53,20 @@ function WalletRow({ w, rank }: { w: WalletStats; rank: number }) {
       href={`${EXPLORER}/address/${w.address}`}
       target="_blank"
       rel="noreferrer"
-      className={`flex items-center gap-3 border-b border-stone-200/70 px-4 py-3 transition-colors ${
-        top3 ? "bg-violet-50/60 hover:bg-violet-50" : "hover:bg-stone-50"
+      className={`flex items-center gap-3 border-b border-(--raven-line)/70 px-4 py-3 transition-colors ${
+        top3 ? "bg-violet-500/10 hover:bg-violet-500/15" : "hover:bg-(--raven-soft)"
       }`}
     >
       <span
         className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg font-mono text-[13px] font-black ${
-          top3 ? "bg-violet-500 text-white" : "bg-stone-200/70 text-stone-500"
+          top3 ? "bg-violet-500 text-white" : "bg-(--raven-soft)/70 text-(--raven-muted)"
         }`}
       >
         {rank + 1}
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <span className="truncate font-mono text-[14px] font-black text-[#1c1917]">
+          <span className="truncate font-mono text-[14px] font-black text-(--raven-ink)">
             {shortAddr(w.address)}
           </span>
           {top3 && (
@@ -77,11 +77,11 @@ function WalletRow({ w, rank }: { w: WalletStats; rank: number }) {
         </div>
         <div className="mt-1.5 flex items-center gap-2.5">
           <SplitMeter buys={w.buys} sells={w.sells} />
-          <p className="min-w-0 font-mono text-[11px] leading-snug text-stone-500">
+          <p className="min-w-0 font-mono text-[11px] leading-snug text-(--raven-muted)">
             <span className="whitespace-nowrap">
               {w.trades} trades ·{" "}
-              <span className="font-bold text-emerald-600">{w.buys}B</span> /{" "}
-              <span className="font-bold text-rose-600">{w.sells}S</span>
+              <span className="font-bold text-emerald-600 dark:text-emerald-400">{w.buys}B</span> /{" "}
+              <span className="font-bold text-rose-600 dark:text-rose-400">{w.sells}S</span>
             </span>{" "}
             <span className="whitespace-nowrap">
               · {w.topToken} · {timeAgo(w.lastActive)}
@@ -92,12 +92,12 @@ function WalletRow({ w, rank }: { w: WalletStats; rank: number }) {
       <div className="shrink-0 text-right">
         <div
           className={`font-mono font-black ${
-            top3 ? "text-xl text-violet-700" : "text-[15px] text-[#1c1917]"
+            top3 ? "text-xl text-violet-700" : "text-[15px] text-(--raven-ink)"
           }`}
         >
           {formatVolume(w.quoteVolume)}
         </div>
-        <div className="font-mono text-[10px] font-bold uppercase tracking-wider text-stone-400">
+        <div className="font-mono text-[10px] font-bold uppercase tracking-wider text-(--raven-faint)">
           volume
         </div>
       </div>
@@ -147,7 +147,7 @@ export default function WalletsView({
       {loading ? (
         <WatchLoading tone="violet" message="reading the room" />
       ) : error ? (
-        <p className="px-4 py-16 text-center font-mono text-sm font-bold text-rose-600">
+        <p className="px-4 py-16 text-center font-mono text-sm font-bold text-rose-600 dark:text-rose-400">
           SCOPE DOWN — {error}
         </p>
       ) : wallets.length === 0 ? (
@@ -157,13 +157,13 @@ export default function WalletsView({
           sub="no wallets in range"
         />
       ) : (
-        <div className="border-t-2 border-[#1c1917]/10">
+        <div className="border-t-2 border-(--raven-ink)/10">
           {wallets.map((w, i) => (
             <WalletRow key={w.address} w={w} rank={i} />
           ))}
         </div>
       )}
-      <p className="px-4 py-4 font-mono text-[11px] leading-relaxed text-stone-500">
+      <p className="px-4 py-4 font-mono text-[11px] leading-relaxed text-(--raven-muted)">
         Ranked by activity (quote-denominated volume), not profitability. PnL
         tracking comes later.
       </p>

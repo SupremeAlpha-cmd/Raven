@@ -1,13 +1,36 @@
 @import "tailwindcss";
 
+/* Class-based dark mode — the theme toggle flips `.dark` on <html>. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme inline {
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
+/* Raven semantic surface tokens. Light = dawn watch, .dark = night watch. */
 :root {
   --raven-paper: #fffdf7;
   --raven-ink: #1c1917;
+  --raven-card: #ffffff;
+  --raven-muted: #57534e;
+  --raven-faint: #a8a29e;
+  --raven-soft: #f5f5f4;
+  --raven-line: #e7e5e4;
+  --raven-shadow: 28, 25, 23;
+  --raven-dot: rgba(28, 25, 23, 0.09);
+}
+
+.dark {
+  --raven-paper: #14120f;
+  --raven-ink: #f2ede3;
+  --raven-card: #1e1b17;
+  --raven-muted: #b3aa9c;
+  --raven-faint: #6e665b;
+  --raven-soft: #26221d;
+  --raven-line: #38322a;
+  --raven-shadow: 0, 0, 0;
+  --raven-dot: rgba(242, 237, 227, 0.08);
 }
 
 html {
@@ -91,7 +114,7 @@ body {
 
 /* Dotted survey grid — the lookout's map */
 .dot-grid {
-  background-image: radial-gradient(rgba(28, 25, 23, 0.09) 1.2px, transparent 1.2px);
+  background-image: radial-gradient(var(--raven-dot) 1.2px, transparent 1.2px);
   background-size: 22px 22px;
 }
 

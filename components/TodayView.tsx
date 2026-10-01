@@ -26,18 +26,18 @@ function fmt(n: number): string {
 /** Heat color for graduation progress: cool early, hot near the line. */
 function heat(pct: number): { filled: string; text: string; sc: string } {
   if (pct >= 90)
-    return { filled: "bg-rose-500", text: "text-rose-600", sc: "#f43f5e" };
+    return { filled: "bg-rose-500", text: "text-rose-600 dark:text-rose-400", sc: "#f43f5e" };
   if (pct >= 70)
     return { filled: "bg-orange-500", text: "text-orange-600", sc: "#f97316" };
   if (pct >= 50)
     return { filled: "bg-amber-500", text: "text-amber-700", sc: "#f59e0b" };
-  return { filled: "bg-emerald-500", text: "text-emerald-600", sc: "#10b981" };
+  return { filled: "bg-emerald-500", text: "text-emerald-600 dark:text-emerald-400", sc: "#10b981" };
 }
 
 function ImminentTag() {
   return (
     <span className="raven-blink inline-flex items-center gap-1.5 rounded-md bg-rose-500 px-2 py-0.5 font-mono text-[10px] font-black uppercase tracking-wider text-white">
-      <span className="inline-block h-1.5 w-1.5 rounded-full bg-white" />
+      <span className="inline-block h-1.5 w-1.5 rounded-full bg-(--raven-card)" />
       graduation imminent
     </span>
   );
@@ -52,17 +52,17 @@ function CrosshairCard({ t }: { t: NearGraduation }) {
       href={`${EXPLORER}/token/${t.token}`}
       target="_blank"
       rel="noreferrer"
-      className="scope-corners block border-2 border-[#1c1917] bg-white p-4 shadow-[4px_4px_0_rgba(28,25,23,0.12)] transition-transform active:scale-[0.99]"
+      className="scope-corners block border-2 border-(--raven-ink) bg-(--raven-card) p-4 shadow-[4px_4px_0_rgba(var(--raven-shadow),0.12)] transition-transform active:scale-[0.99]"
       style={{ ["--sc" as string]: h.sc }}
     >
       <div className="flex items-center justify-between gap-2">
-        <p className="font-mono text-[10px] font-black uppercase tracking-widest text-stone-500">
+        <p className="font-mono text-[10px] font-black uppercase tracking-widest text-(--raven-muted)">
           ▸ in the crosshairs
         </p>
         {pct >= 90 && <ImminentTag />}
       </div>
       <div className="mt-2 flex items-baseline justify-between gap-2">
-        <span className="truncate font-mono text-2xl font-black tracking-tight text-[#1c1917]">
+        <span className="truncate font-mono text-2xl font-black tracking-tight text-(--raven-ink)">
           ${t.symbol}
         </span>
         <span className={`shrink-0 font-mono text-3xl font-black ${h.text}`}>
@@ -77,12 +77,12 @@ function CrosshairCard({ t }: { t: NearGraduation }) {
         className="mt-3 h-4"
         label={`${t.symbol} graduation progress ${pct.toFixed(1)} percent`}
       />
-      <div className="mt-2.5 flex justify-between font-mono text-[11px] font-bold text-stone-500">
+      <div className="mt-2.5 flex justify-between font-mono text-[11px] font-bold text-(--raven-muted)">
         <span>
           {fmt(t.raised)} / {fmt(t.threshold)} USDG
         </span>
         <span>
-          24h <span className="text-stone-800">+{fmt(t.velocity24h)}</span> velocity
+          24h <span className="text-(--raven-ink)">+{fmt(t.velocity24h)}</span> velocity
         </span>
       </div>
     </a>
@@ -97,14 +97,14 @@ function NearRow({ t, rank }: { t: NearGraduation; rank: number }) {
       href={`${EXPLORER}/token/${t.token}`}
       target="_blank"
       rel="noreferrer"
-      className="flex gap-3 border-b border-stone-200/70 px-4 py-3.5 transition-colors hover:bg-amber-50/70"
+      className="flex gap-3 border-b border-(--raven-line)/70 px-4 py-3.5 transition-colors hover:bg-amber-500/10"
     >
-      <span className="w-7 shrink-0 pt-0.5 text-center font-mono text-[13px] font-black text-stone-400">
+      <span className="w-7 shrink-0 pt-0.5 text-center font-mono text-[13px] font-black text-(--raven-faint)">
         {rank + 1}
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between gap-2">
-          <span className="truncate font-mono text-[15px] font-black text-[#1c1917]">
+          <span className="truncate font-mono text-[15px] font-black text-(--raven-ink)">
             ${t.symbol}
           </span>
           <span className="flex shrink-0 items-center gap-2">
@@ -121,12 +121,12 @@ function NearRow({ t, rank }: { t: NearGraduation; rank: number }) {
           className="mt-2 h-2.5"
           label={`${t.symbol} graduation progress ${pct.toFixed(1)} percent`}
         />
-        <div className="mt-1.5 flex justify-between font-mono text-[11px] text-stone-500">
+        <div className="mt-1.5 flex justify-between font-mono text-[11px] text-(--raven-muted)">
           <span>
             {fmt(t.raised)} / {fmt(t.threshold)} USDG
           </span>
           <span>
-            24h <span className="font-bold text-stone-700">+{fmt(t.velocity24h)}</span>
+            24h <span className="font-bold text-(--raven-muted)">+{fmt(t.velocity24h)}</span>
           </span>
         </div>
       </div>
@@ -140,17 +140,17 @@ function GradRow({ g }: { g: Graduation }) {
       href={`${EXPLORER}/token/${g.token}`}
       target="_blank"
       rel="noreferrer"
-      className="flex items-center justify-between gap-3 border-b border-stone-200/70 px-4 py-2.5 transition-colors hover:bg-emerald-50/70"
+      className="flex items-center justify-between gap-3 border-b border-(--raven-line)/70 px-4 py-2.5 transition-colors hover:bg-emerald-500/10"
     >
       <span className="flex items-center gap-2">
         <span className="rounded-md bg-emerald-500 px-1.5 py-0.5 font-mono text-[10px] font-black text-white">
           ✓
         </span>
-        <span className="font-mono text-[13px] font-black text-[#1c1917]">
+        <span className="font-mono text-[13px] font-black text-(--raven-ink)">
           ${g.symbol}
         </span>
       </span>
-      <span className="shrink-0 font-mono text-[11px] text-stone-500">
+      <span className="shrink-0 font-mono text-[11px] text-(--raven-muted)">
         seeded {fmt(g.pairAmount)} {g.pair} · {timeAgo(g.timestamp)}
       </span>
     </a>
@@ -189,7 +189,7 @@ export default function TodayView() {
   if (loading) return <WatchLoading tone="amber" message="scanning the curves" />;
   if (error) {
     return (
-      <p className="px-4 py-16 text-center font-mono text-sm font-bold text-rose-600">
+      <p className="px-4 py-16 text-center font-mono text-sm font-bold text-rose-600 dark:text-rose-400">
         SCOPE DOWN — {error}
       </p>
     );
@@ -202,7 +202,7 @@ export default function TodayView() {
       <div className="flex items-center justify-between px-4 pb-2 pt-4">
         <SignalTag tone="amber">nearing graduation // ranked by velocity</SignalTag>
         {stale && (
-          <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-stone-400">
+          <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-(--raven-faint)">
             cached
           </span>
         )}
@@ -219,7 +219,7 @@ export default function TodayView() {
             <CrosshairCard t={leader} />
           </div>
           {rest.length > 0 && (
-            <div className="border-t-2 border-[#1c1917]/10">
+            <div className="border-t-2 border-(--raven-ink)/10">
               {rest.map((t, i) => (
                 <NearRow key={t.token} t={t} rank={i + 1} />
               ))}
@@ -232,17 +232,17 @@ export default function TodayView() {
         <SignalTag tone="emerald">graduated // seeded on-chain</SignalTag>
       </div>
       {graduated.length === 0 ? (
-        <p className="px-4 py-4 font-mono text-[12px] text-stone-400">
+        <p className="px-4 py-4 font-mono text-[12px] text-(--raven-faint)">
           no graduations in range
         </p>
       ) : (
-        <div className="border-t border-stone-200/70">
+        <div className="border-t border-(--raven-line)/70">
           {graduated.map((g) => (
             <GradRow key={g.token + g.blockNumber} g={g} />
           ))}
         </div>
       )}
-      <p className="px-4 py-4 font-mono text-[11px] leading-relaxed text-stone-500">
+      <p className="px-4 py-4 font-mono text-[11px] leading-relaxed text-(--raven-muted)">
         Graduation = 8,090 USDG net raised on the bonding curve. Progress is
         computed from on-chain buys and sells.
       </p>

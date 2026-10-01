@@ -5,11 +5,11 @@ import type { ReactNode } from "react";
 export type Tone = "amber" | "emerald" | "violet" | "rose" | "stone";
 
 const toneText: Record<Tone, string> = {
-  amber: "text-amber-700",
-  emerald: "text-emerald-700",
-  violet: "text-violet-700",
-  rose: "text-rose-700",
-  stone: "text-stone-500",
+  amber: "text-amber-700 dark:text-amber-400",
+  emerald: "text-emerald-700 dark:text-emerald-400",
+  violet: "text-violet-700 dark:text-violet-400",
+  rose: "text-rose-700 dark:text-rose-400",
+  stone: "text-(--raven-muted)",
 };
 
 const toneSolid: Record<Tone, string> = {
@@ -17,7 +17,7 @@ const toneSolid: Record<Tone, string> = {
   emerald: "bg-emerald-500",
   violet: "bg-violet-500",
   rose: "bg-rose-500",
-  stone: "bg-stone-400",
+  stone: "bg-(--raven-faint)",
 };
 
 /** Mono signal tag — Raven's section header. Replaces soft eyebrows. */
@@ -45,7 +45,7 @@ export function Meter({
   pct,
   segments = 24,
   filled,
-  track = "bg-stone-200/80",
+  track = "bg-(--raven-soft)",
   className = "",
   label,
 }: {
@@ -158,7 +158,7 @@ export function EmptyScope({
           {message}
         </p>
         {sub && (
-          <p className="mt-2 font-mono text-[11px] text-stone-500">{sub}</p>
+          <p className="mt-2 font-mono text-[11px] text-(--raven-muted)">{sub}</p>
         )}
       </div>
     </div>

@@ -34,11 +34,11 @@ function Toggle({ on, onClick }: { on: boolean; onClick: () => void }) {
       onClick={onClick}
       aria-label={on ? "disable rule" : "enable rule"}
       className={`relative h-7 w-12 shrink-0 rounded-lg border-2 transition-colors ${
-        on ? "border-rose-600 bg-rose-500" : "border-stone-300 bg-stone-200"
+        on ? "border-rose-600 bg-rose-500/100" : "border-(--raven-line) bg-(--raven-soft)"
       }`}
     >
       <span
-        className={`absolute top-[2px] h-[18px] w-[18px] rounded-md bg-white shadow transition-all ${
+        className={`absolute top-[2px] h-[18px] w-[18px] rounded-md bg-(--raven-card) shadow transition-all ${
           on ? "left-[24px]" : "left-[2px]"
         }`}
       />
@@ -71,7 +71,7 @@ export default function AlertsView() {
     <div className="px-4 pb-10">
       {/* Notification permission */}
       {notifPerm !== "granted" && notifPerm !== "unsupported" && (
-        <div className="mt-4 border-2 border-rose-500 bg-rose-50 px-4 py-3.5 shadow-[4px_4px_0_rgba(244,63,94,0.15)]">
+        <div className="mt-4 border-2 border-rose-500 bg-rose-500/10 px-4 py-3.5 shadow-[4px_4px_0_rgba(244,63,94,0.15)]">
           <p className="font-mono text-[13px] font-black uppercase tracking-wide text-rose-700">
             ▸ want a tap on the shoulder?
           </p>
@@ -81,7 +81,7 @@ export default function AlertsView() {
             </p>
             <button
               onClick={requestPermission}
-              className="shrink-0 rounded-lg bg-rose-500 px-5 py-2 text-[13px] font-black text-white transition-all hover:bg-rose-400 active:scale-[0.97]"
+              className="shrink-0 rounded-lg bg-rose-500/100 px-5 py-2 text-[13px] font-black text-white transition-all hover:bg-rose-400 active:scale-[0.97]"
             >
               ENABLE
             </button>
@@ -89,7 +89,7 @@ export default function AlertsView() {
         </div>
       )}
       {notifPerm === "denied" && (
-        <p className="mt-4 border border-stone-300 bg-white px-4 py-3 font-mono text-[12px] text-stone-500">
+        <p className="mt-4 border border-(--raven-line) bg-(--raven-card) px-4 py-3 font-mono text-[12px] text-(--raven-muted)">
           System notifications are blocked for this site — alerts will still
           appear in the feed below. Re-enable them in your browser's site
           settings.
@@ -107,10 +107,10 @@ export default function AlertsView() {
           return (
             <div
               key={r.id}
-              className={`border-2 bg-white px-4 py-3 ${
+              className={`border-2 bg-(--raven-card) px-4 py-3 ${
                 r.enabled
-                  ? "scope-corners border-[#1c1917] shadow-[4px_4px_0_rgba(28,25,23,0.12)]"
-                  : "border-stone-200 opacity-50"
+                  ? "scope-corners border-(--raven-ink) shadow-[4px_4px_0_rgba(var(--raven-shadow),0.12)]"
+                  : "border-(--raven-line) opacity-50"
               }`}
               style={
                 r.enabled
@@ -129,7 +129,7 @@ export default function AlertsView() {
                   <button
                     onClick={() => removeRule(r.id)}
                     aria-label="delete rule"
-                    className="rounded-md px-2 py-1 font-mono text-[13px] font-bold text-stone-400 hover:text-rose-600"
+                    className="rounded-md px-2 py-1 font-mono text-[13px] font-bold text-(--raven-faint) hover:text-rose-600 dark:text-rose-400"
                   >
                     ✕
                   </button>
@@ -137,7 +137,7 @@ export default function AlertsView() {
               </div>
               {meta.needsThreshold && (
                 <div className="mt-2.5 flex items-center gap-2">
-                  <span className="font-mono text-[12px] font-bold text-stone-500">
+                  <span className="font-mono text-[12px] font-bold text-(--raven-muted)">
                     AT / ABOVE
                   </span>
                   <input
@@ -147,14 +147,14 @@ export default function AlertsView() {
                     onChange={(e) =>
                       setThreshold(r.id, Number(e.target.value))
                     }
-                    className="w-24 rounded-lg border-2 border-stone-300 bg-white px-2.5 py-1.5 font-mono text-[13px] font-bold text-[#1c1917] outline-none focus:border-rose-500"
+                    className="w-24 rounded-lg border-2 border-(--raven-line) bg-(--raven-card) px-2.5 py-1.5 font-mono text-[13px] font-bold text-(--raven-ink) outline-none focus:border-rose-500"
                   />
-                  <span className="font-mono text-[12px] text-stone-500">
+                  <span className="font-mono text-[12px] text-(--raven-muted)">
                     {meta.unit}
                   </span>
                 </div>
               )}
-              <p className="mt-1.5 font-mono text-[11px] text-stone-500">
+              <p className="mt-1.5 font-mono text-[11px] text-(--raven-muted)">
                 {meta.hint}
               </p>
             </div>
@@ -163,7 +163,7 @@ export default function AlertsView() {
       </div>
 
       {/* Add rule */}
-      <div className="mt-3 border-2 border-dashed border-stone-300 px-4 py-3.5">
+      <div className="mt-3 border-2 border-dashed border-(--raven-line) px-4 py-3.5">
         <SignalTag tone="stone">＋ new rule</SignalTag>
         <div className="mt-2.5 flex flex-wrap items-center gap-2">
           <select
@@ -173,7 +173,7 @@ export default function AlertsView() {
               setNewType(t);
               setNewThreshold(String(RULE_META[t].defaultThreshold));
             }}
-            className="rounded-lg border-2 border-stone-300 bg-white px-2.5 py-1.5 font-mono text-[13px] font-bold text-[#1c1917] outline-none"
+            className="rounded-lg border-2 border-(--raven-line) bg-(--raven-card) px-2.5 py-1.5 font-mono text-[13px] font-bold text-(--raven-ink) outline-none"
           >
             {(Object.keys(RULE_META) as AlertRuleType[]).map((t) => (
               <option key={t} value={t}>
@@ -188,7 +188,7 @@ export default function AlertsView() {
               value={newThreshold}
               onChange={(e) => setNewThreshold(e.target.value)}
               aria-label="threshold"
-              className="w-24 rounded-lg border-2 border-stone-300 bg-white px-2.5 py-1.5 font-mono text-[13px] font-bold text-[#1c1917] outline-none focus:border-rose-500"
+              className="w-24 rounded-lg border-2 border-(--raven-line) bg-(--raven-card) px-2.5 py-1.5 font-mono text-[13px] font-bold text-(--raven-ink) outline-none focus:border-rose-500"
             />
           )}
           <button
@@ -196,7 +196,7 @@ export default function AlertsView() {
               addRule(newType, Number(newThreshold) || 1);
               setNewThreshold(String(RULE_META[newType].defaultThreshold));
             }}
-            className="rounded-lg bg-rose-500 px-5 py-1.5 text-[13px] font-black text-white transition-all hover:bg-rose-400 active:scale-[0.97]"
+            className="rounded-lg bg-rose-500/100 px-5 py-1.5 text-[13px] font-black text-white transition-all hover:bg-rose-400 active:scale-[0.97]"
           >
             ADD RULE
           </button>
@@ -209,7 +209,7 @@ export default function AlertsView() {
         {feed.length > 0 && (
           <button
             onClick={clearFeed}
-            className="font-mono text-[11px] font-bold text-stone-400 hover:text-stone-600"
+            className="font-mono text-[11px] font-bold text-(--raven-faint) hover:text-(--raven-muted)"
           >
             clear all
           </button>
@@ -226,10 +226,10 @@ export default function AlertsView() {
           {feed.map((a, i) => (
             <div
               key={a.id}
-              className={`border-2 bg-white px-4 py-3 ${
+              className={`border-2 bg-(--raven-card) px-4 py-3 ${
                 i === 0
-                  ? "scope-corners border-[#1c1917] shadow-[4px_4px_0_rgba(28,25,23,0.12)]"
-                  : "border-stone-200"
+                  ? "scope-corners border-(--raven-ink) shadow-[4px_4px_0_rgba(var(--raven-shadow),0.12)]"
+                  : "border-(--raven-line)"
               }`}
               style={
                 i === 0
@@ -239,20 +239,20 @@ export default function AlertsView() {
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-[15px] font-black tracking-tight text-[#1c1917]">
+                  <p className="text-[15px] font-black tracking-tight text-(--raven-ink)">
                     {a.title}
                   </p>
-                  <p className="mt-0.5 font-mono text-[12px] text-stone-500">
+                  <p className="mt-0.5 font-mono text-[12px] text-(--raven-muted)">
                     {a.detail}
                   </p>
                   <div className="mt-1.5 flex items-center gap-3 font-mono text-[11px]">
-                    <span className="font-bold text-stone-400">{timeAgo(a.firedAt)}</span>
+                    <span className="font-bold text-(--raven-faint)">{timeAgo(a.firedAt)}</span>
                     {a.link && (
                       <a
                         href={a.link}
                         target="_blank"
                         rel="noreferrer"
-                        className="font-bold text-rose-600 hover:text-rose-500"
+                        className="font-bold text-rose-600 dark:text-rose-400 hover:text-rose-500"
                       >
                         view on explorer →
                       </a>
@@ -262,7 +262,7 @@ export default function AlertsView() {
                 <button
                   onClick={() => dismissAlert(a.id)}
                   aria-label="dismiss alert"
-                  className="shrink-0 rounded-md px-2 py-1 font-mono text-[13px] font-bold text-stone-400 hover:text-stone-600"
+                  className="shrink-0 rounded-md px-2 py-1 font-mono text-[13px] font-bold text-(--raven-faint) hover:text-(--raven-muted)"
                 >
                   ✕
                 </button>
@@ -271,7 +271,7 @@ export default function AlertsView() {
           ))}
         </div>
       )}
-      <p className="px-1 py-4 font-mono text-[11px] leading-relaxed text-stone-500">
+      <p className="px-1 py-4 font-mono text-[11px] leading-relaxed text-(--raven-muted)">
         Rules live in this browser only — no account, nothing leaves your
         device.
       </p>
