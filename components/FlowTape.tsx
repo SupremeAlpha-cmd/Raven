@@ -7,9 +7,9 @@ const REFRESH_MS = 30_000;
 const EXPLORER = "https://robinhoodchain.blockscout.com";
 
 function timeAgo(ts: number): string {
-  const s = Math.max(0, Math.floor(Date.now() / 1000) - ts);
-  if (s < 60) return `${s}s ago`;
-  const m = Math.floor(s / 60);
+  const secs = Math.max(0, Math.floor(Date.now() / 1000) - ts);
+  if (secs < 60) return `${secs}s ago`;
+  const m = Math.floor(secs / 60);
   if (m < 60) return `${m}m ago`;
   return `${Math.floor(m / 60)}h ago`;
 }
@@ -21,26 +21,34 @@ function shortAddr(a: string): string {
 function DirectionBadge({ d }: { d: TapeEntry["direction"] }) {
   const styles =
     d === "buy"
-      ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+      ? "bg-emerald-400/15 text-emerald-300 border-emerald-400/25"
       : d === "sell"
-        ? "bg-red-500/10 text-red-400 border-red-500/20"
-        : "bg-zinc-500/10 text-zinc-400 border-zinc-500/20";
+        ? "bg-rose-400/15 text-rose-300 border-rose-400/25"
+        : "bg-zinc-400/10 text-zinc-400 border-zinc-400/20";
   return (
     <span
-      className={`inline-block w-14 shrink-0 rounded border px-1.5 py-0.5 text-center font-mono text-[11px] font-semibold uppercase ${styles}`}
+      className={`inline-block w-14 shrink-0 rounded-full border px-1.5 py-0.5 text-center font-mono text-[11px] font-bold uppercase ${styles}`}
     >
       {d}
     </span>
   );
 }
 
-function TapeRow({ e }: { e: TapeEntry }) {
+function TapeRow({ e, fresh }: { e: TapeEntry; fresh: boolean }) {
+  const accent =
+    e.direction === "buy"
+      ? "hover:border-emerald-400/25"
+      : e.direction === "sell"
+        ? "hover:border-rose-400/25"
+        : "hover:border-white/15";
   return (
     <a
       href={`${EXPLORER}/tx/${e.txHash}`}
       target="_blank"
       rel="noreferrer"
-      className="flex items-center gap-3 border-b border-zinc-800/60 px-4 py-2.5 transition-colors hover:bg-zinc-900/60"
+      className={`flex items-center gap-3 border-b border-white/5 px-4 py-2.5 transition-colors hover:bg-white/[0.03] ${accent} ${
+        fresh ? "raven-row-enter" : ""
+      }`}
     >
       <DirectionBadge d={e.direction} />
       <div className="min-w-0 flex-1">
@@ -60,6 +68,34 @@ function TapeRow({ e }: { e: TapeEntry }) {
   );
 }
 
+function PressureBar({ entries }: { entries: TapeEntry[] }) {
+  const buys = entries.filter((e) => e.direction === "buy").length;
+  const sells = entries.filter((e) => e.direction === "sell").length;
+  const total = buys + sells;
+  const buyPct = total === 0 ? 50 : (buys / total) * 100;
+  return (
+    <div className="rounded-2xl border border-white/10 bg-[#12151d] px-4 py-3">
+      <div className="flex items-center justify-between font-mono text-[11px]">
+        <span className="font-bold text-emerald-300">{buys} buys</span>
+        <span className="uppercase tracking-wider text-zinc-500">
+          tape pressure
+        </span>
+        <span className="font-bold text-rose-300">{sells} sells</span>
+      </div>
+      <div className="mt-2 flex h-2 overflow-hidden rounded-full bg-white/5">
+        <div
+          className="h-full rounded-full bg-emerald-400 transition-all"
+          style={{ width: `${buyPct}%` }}
+        />
+        <div
+          className="h-full rounded-full bg-rose-400 transition-all"
+          style={{ width: `${100 - buyPct}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
 export default function FlowTape({
   onBlock,
 }: {
@@ -69,6 +105,7 @@ export default function FlowTape({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [countdown, setCountdown] = useState(REFRESH_MS / 1000);
+  const seen = useRef<Set<string>>(new Set());
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const load = useCallback(async () => {
@@ -104,6 +141,14 @@ export default function FlowTape({
     };
   }, [load]);
 
+  // Mark rows seen after render so only genuinely new rows animate
+  useEffect(() => {
+    const t = setTimeout(() => {
+      entries.forEach((e) => seen.current.add(e.txHash));
+    }, 600);
+    return () => clearTimeout(t);
+  }, [entries]);
+
   return (
     <div>
       <div className="flex items-center justify-between px-4 py-3">
@@ -119,7 +164,7 @@ export default function FlowTape({
           tuning the frequency…
         </p>
       ) : error ? (
-        <p className="px-4 py-8 text-center font-mono text-sm text-red-400">
+        <p className="px-4 py-8 text-center font-mono text-sm text-rose-300">
           {error}
         </p>
       ) : entries.length === 0 ? (
@@ -127,11 +172,16 @@ export default function FlowTape({
           quiet skies — no swaps in range
         </p>
       ) : (
-        <div className="border-t border-zinc-800/60">
-          {entries.map((e) => (
-            <TapeRow key={e.txHash} e={e} />
-          ))}
-        </div>
+        <>
+          <div className="px-4 pb-3">
+            <PressureBar entries={entries} />
+          </div>
+          <div className="border-t border-white/5">
+            {entries.map((e) => (
+              <TapeRow key={e.txHash} e={e} fresh={!seen.current.has(e.txHash)} />
+            ))}
+          </div>
+        </>
       )}
     </div>
   );

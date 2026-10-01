@@ -24,6 +24,56 @@ function timeAgo(ts: number): string {
   return `${Math.floor(m / 60)}h ago`;
 }
 
+const rankColor = ["text-amber-300", "text-zinc-300", "text-orange-400"];
+
+function WalletRow({ w, rank }: { w: WalletStats; rank: number }) {
+  const total = w.buys + w.sells;
+  const buyPct = total === 0 ? 50 : (w.buys / total) * 100;
+  return (
+    <a
+      key={w.address}
+      href={`${EXPLORER}/address/${w.address}`}
+      target="_blank"
+      rel="noreferrer"
+      className="flex items-center gap-3 border-b border-white/5 px-4 py-3 transition-colors hover:bg-white/[0.03]"
+    >
+      <span
+        className={`w-6 shrink-0 font-mono text-[12px] font-bold ${
+          rankColor[rank] ?? "text-zinc-600"
+        }`}
+      >
+        {rank + 1}
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="font-mono text-[13px] font-semibold text-zinc-100">
+          {shortAddr(w.address)}
+        </div>
+        <div className="mt-1 flex items-center gap-2">
+          <div className="flex h-1 w-16 overflow-hidden rounded-full bg-white/5">
+            <div
+              className="h-full bg-emerald-400"
+              style={{ width: `${buyPct}%` }}
+            />
+            <div className="h-full bg-rose-400" style={{ width: `${100 - buyPct}%` }} />
+          </div>
+          <span className="font-mono text-[11px] text-zinc-500">
+            {w.trades} trades ·{" "}
+            <span className="text-emerald-300/90">{w.buys}B</span> /{" "}
+            <span className="text-rose-300/90">{w.sells}S</span> · {w.topToken} ·{" "}
+            {timeAgo(w.lastActive)}
+          </span>
+        </div>
+      </div>
+      <div className="shrink-0 text-right">
+        <div className="font-mono text-[13px] font-bold text-violet-200">
+          {formatVolume(w.quoteVolume)}
+        </div>
+        <div className="font-mono text-[10px] text-zinc-600">volume</div>
+      </div>
+    </a>
+  );
+}
+
 export default function WalletsView({
   onBlock,
 }: {
@@ -61,7 +111,7 @@ export default function WalletsView({
         <p className="font-mono text-[11px] uppercase tracking-wider text-zinc-500">
           most active wallets
         </p>
-        <p className="font-mono text-[11px] text-zinc-600">
+        <p className="font-mono text-[11px] text-violet-300/80">
           {tradersSeen} traders tracked
         </p>
       </div>
@@ -70,7 +120,7 @@ export default function WalletsView({
           reading the room…
         </p>
       ) : error ? (
-        <p className="px-4 py-8 text-center font-mono text-sm text-red-400">
+        <p className="px-4 py-8 text-center font-mono text-sm text-rose-300">
           {error}
         </p>
       ) : wallets.length === 0 ? (
@@ -78,31 +128,9 @@ export default function WalletsView({
           no wallets in range
         </p>
       ) : (
-        <div className="border-t border-zinc-800/60">
+        <div className="border-t border-white/5">
           {wallets.map((w, i) => (
-            <a
-              key={w.address}
-              href={`${EXPLORER}/address/${w.address}`}
-              target="_blank"
-              rel="noreferrer"
-              className="flex items-center gap-3 border-b border-zinc-800/60 px-4 py-2.5 transition-colors hover:bg-zinc-900/60"
-            >
-              <span className="w-6 shrink-0 font-mono text-[11px] text-zinc-600">
-                {i + 1}
-              </span>
-              <div className="min-w-0 flex-1">
-                <div className="font-mono text-[13px] text-zinc-100">
-                  {shortAddr(w.address)}
-                </div>
-                <div className="mt-0.5 font-mono text-[11px] text-zinc-500">
-                  {w.trades} trades · {w.buys}B / {w.sells}S · {w.topToken} ·
-                  active {timeAgo(w.lastActive)}
-                </div>
-              </div>
-              <div className="shrink-0 font-mono text-[13px] text-zinc-200">
-                {formatVolume(w.quoteVolume)}
-              </div>
-            </a>
+            <WalletRow key={w.address} w={w} rank={i} />
           ))}
         </div>
       )}
