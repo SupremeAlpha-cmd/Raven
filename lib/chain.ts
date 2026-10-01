@@ -23,6 +23,42 @@ export const TRANSFER_TOPIC =
 
 const UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36";
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * POST to the RPC with retries on transient failures.
+ * Retries: network errors, timeouts, HTTP 429 and 5xx — with exponential
+ * backoff (0.7s, 1.4s). Fails fast on other 4xx and on JSON-RPC errors.
+ */
+async function postRpc(body: unknown, timeoutMs: number): Promise<any> {
+  const MAX_ATTEMPTS = 3;
+  let lastErr: unknown = null;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    let res: Response;
+    try {
+      res = await fetch(RPC_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "User-Agent": UA },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+    } catch (err) {
+      // Network-level failure (DNS, connection reset, timeout) — retriable.
+      lastErr = err;
+      if (attempt < MAX_ATTEMPTS) await sleep(700 * 2 ** (attempt - 1));
+      continue;
+    }
+    if (res.ok) return res.json();
+    lastErr = new Error(`RPC HTTP ${res.status}`);
+    // Retry 429/5xx; fail fast on other 4xx.
+    if ((res.status !== 429 && res.status < 500) || attempt === MAX_ATTEMPTS) {
+      throw lastErr;
+    }
+    await sleep(700 * 2 ** (attempt - 1));
+  }
+  throw lastErr;
+}
+
 export interface RpcLog {
   address: string;
   topics: string[];
@@ -33,14 +69,10 @@ export interface RpcLog {
 }
 
 export async function rpc<T>(method: string, params: unknown[]): Promise<T> {
-  const res = await fetch(RPC_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "User-Agent": UA },
-    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
-    signal: AbortSignal.timeout(20000),
-  });
-  if (!res.ok) throw new Error(`RPC ${method} failed: ${res.status}`);
-  const json = (await res.json()) as { result?: T; error?: { message: string } };
+  const json = (await postRpc(
+    { jsonrpc: "2.0", id: 1, method, params },
+    20000,
+  )) as { result?: T; error?: { message: string } };
   if (json.error) throw new Error(`RPC ${method} error: ${json.error.message}`);
   return json.result as T;
 }
@@ -54,14 +86,7 @@ export async function rpcBatch<T>(
     method: c.method,
     params: c.params,
   }));
-  const res = await fetch(RPC_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "User-Agent": UA },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(30000),
-  });
-  if (!res.ok) throw new Error(`RPC batch failed: ${res.status}`);
-  const json = (await res.json()) as { id: number; result?: T }[];
+  const json = (await postRpc(body, 30000)) as { id: number; result?: T }[];
   const out: (T | null)[] = new Array(calls.length).fill(null);
   for (const r of json) {
     if (r.id >= 0 && r.id < out.length) out[r.id] = r.result ?? null;

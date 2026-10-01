@@ -68,8 +68,28 @@ let cache: { at: number; data: { nearing: NearGraduation[]; graduated: Graduatio
 export async function getToday(): Promise<{
   nearing: NearGraduation[];
   graduated: Graduation[];
+  stale: boolean;
 }> {
-  if (cache && Date.now() - cache.at < CACHE_TTL_MS) return cache.data;
+  if (cache && Date.now() - cache.at < CACHE_TTL_MS) {
+    return { ...cache.data, stale: false };
+  }
+  try {
+    const data = await buildToday();
+    cache = { at: Date.now(), data };
+    return { ...data, stale: false };
+  } catch (err) {
+    // A transient RPC blip shouldn't blank the tab: graduations move slowly,
+    // so slightly old data beats an error page. Only throw (→ 502) when
+    // we've never succeeded once.
+    if (cache) return { ...cache.data, stale: true };
+    throw err;
+  }
+}
+
+async function buildToday(): Promise<{
+  nearing: NearGraduation[];
+  graduated: Graduation[];
+}> {
 
   const latest = await getLatestBlock();
   const from = Math.max(0, latest - SCAN_BLOCKS);
@@ -213,7 +233,5 @@ export async function getToday(): Promise<{
   }
   graduated.sort((a, b) => b.blockNumber - a.blockNumber);
 
-  const data = { nearing, graduated: graduated.slice(0, 20) };
-  cache = { at: Date.now(), data };
-  return data;
+  return { nearing, graduated: graduated.slice(0, 20) };
 }

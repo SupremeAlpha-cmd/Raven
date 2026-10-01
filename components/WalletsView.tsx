@@ -77,12 +77,16 @@ function WalletRow({ w, rank }: { w: WalletStats; rank: number }) {
         </div>
         <div className="mt-1.5 flex items-center gap-2.5">
           <SplitMeter buys={w.buys} sells={w.sells} />
-          <span className="truncate font-mono text-[11px] text-stone-500">
-            {w.trades} trades ·{" "}
-            <span className="font-bold text-emerald-600">{w.buys}B</span> /{" "}
-            <span className="font-bold text-rose-600">{w.sells}S</span> · {w.topToken} ·{" "}
-            {timeAgo(w.lastActive)}
-          </span>
+          <p className="min-w-0 font-mono text-[11px] leading-snug text-stone-500">
+            <span className="whitespace-nowrap">
+              {w.trades} trades ·{" "}
+              <span className="font-bold text-emerald-600">{w.buys}B</span> /{" "}
+              <span className="font-bold text-rose-600">{w.sells}S</span>
+            </span>{" "}
+            <span className="whitespace-nowrap">
+              · {w.topToken} · {timeAgo(w.lastActive)}
+            </span>
+          </p>
         </div>
       </div>
       <div className="shrink-0 text-right">

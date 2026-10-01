@@ -162,6 +162,7 @@ export default function TodayView() {
   const [graduated, setGraduated] = useState<Graduation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [stale, setStale] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -171,6 +172,7 @@ export default function TodayView() {
       const json = await res.json();
       setNearing(json.nearing ?? []);
       setGraduated(json.graduated ?? []);
+      setStale(json.stale === true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "failed to load today");
     } finally {
@@ -199,6 +201,11 @@ export default function TodayView() {
     <div>
       <div className="flex items-center justify-between px-4 pb-2 pt-4">
         <SignalTag tone="amber">nearing graduation // ranked by velocity</SignalTag>
+        {stale && (
+          <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-stone-400">
+            cached
+          </span>
+        )}
       </div>
       {nearing.length === 0 ? (
         <EmptyScope
