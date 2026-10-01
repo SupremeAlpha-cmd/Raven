@@ -5,8 +5,10 @@ import { useState } from "react";
 import FlowTape from "@/components/FlowTape";
 import TodayView from "@/components/TodayView";
 import WalletsView from "@/components/WalletsView";
+import AlertsView from "@/components/AlertsView";
+import { AlertsProvider, useAlerts } from "@/components/AlertsContext";
 
-type Tab = "today" | "flow" | "wallets";
+type Tab = "today" | "flow" | "wallets" | "alerts";
 
 const tabs: { id: Tab; label: string; active: string; dot: string }[] = [
   {
@@ -27,11 +29,33 @@ const tabs: { id: Tab; label: string; active: string; dot: string }[] = [
     active: "bg-violet-400/15 text-violet-200",
     dot: "bg-violet-400",
   },
+  {
+    id: "alerts",
+    label: "Alerts",
+    active: "bg-rose-400/15 text-rose-200",
+    dot: "bg-rose-400",
+  },
 ];
 
-export default function Raven() {
+function AlertBadge() {
+  const { unread } = useAlerts();
+  if (unread === 0) return null;
+  return (
+    <span className="ml-1 rounded-full bg-rose-400 px-1.5 py-0.5 font-mono text-[10px] font-bold text-[#0b0d12]">
+      {unread > 99 ? "99+" : unread}
+    </span>
+  );
+}
+
+function Terminal() {
   const [tab, setTab] = useState<Tab>("flow");
   const [latestBlock, setLatestBlock] = useState<number | null>(null);
+  const { markRead } = useAlerts();
+
+  const selectTab = (id: Tab) => {
+    setTab(id);
+    if (id === "alerts") markRead();
+  };
 
   return (
     <div className="min-h-screen bg-[#0b0d12] text-zinc-100">
@@ -63,7 +87,7 @@ export default function Raven() {
             {tabs.map((t) => (
               <button
                 key={t.id}
-                onClick={() => setTab(t.id)}
+                onClick={() => selectTab(t.id)}
                 className={`flex flex-1 items-center justify-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
                   tab === t.id
                     ? t.active
@@ -76,6 +100,7 @@ export default function Raven() {
                   }`}
                 />
                 {t.label}
+                {t.id === "alerts" && <AlertBadge />}
               </button>
             ))}
           </div>
@@ -86,7 +111,16 @@ export default function Raven() {
         {tab === "flow" && <FlowTape onBlock={setLatestBlock} />}
         {tab === "today" && <TodayView />}
         {tab === "wallets" && <WalletsView onBlock={setLatestBlock} />}
+        {tab === "alerts" && <AlertsView />}
       </main>
     </div>
+  );
+}
+
+export default function Raven() {
+  return (
+    <AlertsProvider>
+      <Terminal />
+    </AlertsProvider>
   );
 }
