@@ -24,15 +24,15 @@ import {
 import { getTokenMeta } from "./tape";
 
 export const FACTORY = "0x7ed598bcef8bd9edd8c97a195c6d13f40801ec7e";
-const TOKEN_LAUNCHED_TOPIC =
+export const TOKEN_LAUNCHED_TOPIC =
   "0x8d4aad4953d0ca700d468f3753aa14432d1b35b43ec6409f051fb6aa43a89607";
 const POOL_GRADUATED_TOPIC =
   "0x0a44ef75df69c534f43cd6c1aa3ef8983065fe5fe79ef9e79f6494e6f258c259";
-const CURVE_BUY_TOPIC =
+export const CURVE_BUY_TOPIC =
   "0xec36bf571f136799e8dc0b0b8bea4b04d8bd3d43de838aab0d5fc21d4cbfc455";
-const CURVE_SELL_TOPIC =
+export const CURVE_SELL_TOPIC =
   "0x8113d738abdcb6b38357e9d53a54a7157861a09031b453651f0fe7fe151f59df";
-const GET_LAUNCHED_TOKEN = "0x3cf28b5a"; // getLaunchedToken(address)
+export const GET_LAUNCHED_TOKEN = "0x3cf28b5a"; // getLaunchedToken(address)
 
 const SCAN_BLOCKS = 200_000; // launch + graduation lookback
 const MAX_CURVES = 25; // per-scan cap; most recent launches first
@@ -57,7 +57,7 @@ export interface Graduation {
   pair: "USDG" | "native";
 }
 
-function word(data: string, i: number): bigint {
+export function word(data: string, i: number): bigint {
   const clean = data.startsWith("0x") ? data.slice(2) : data;
   return hexToBigInt("0x" + clean.slice(i * 64, (i + 1) * 64));
 }

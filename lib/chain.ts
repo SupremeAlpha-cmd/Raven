@@ -98,7 +98,7 @@ export async function getLogs(
   fromBlock: number,
   toBlock: number,
   address: string | null,
-  topics: string[],
+  topics: (string | null)[],
 ): Promise<RpcLog[]> {
   const filter: Record<string, unknown> = {
     fromBlock: "0x" + fromBlock.toString(16),
