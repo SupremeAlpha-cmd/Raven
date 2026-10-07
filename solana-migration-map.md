@@ -1,6 +1,12 @@
 # Raven: Robinhood Chain → Solana Migration Map
 
-**Status:** planning document, not implementation. Branch `solana` created 2026-10-06 (Bobby's call).
+**Status:** IMPLEMENTED 2026-10-07 (commit `cbca86e` on branch `solana`).
+Data layer rewritten for pump.fun on Solana; all 4 API routes verified live
+against mainnet. See commit message for details. Open questions §6 still
+stand for Javin/Bobby (notably: Helius key provisioning, Robinhood
+deployment fate, domain rename).
+
+**Original planning status:** planning document, not implementation. Branch `solana` created 2026-10-06 (Bobby's call).
 **Rule:** do not write migration code until this map is reviewed.
 
 ---
