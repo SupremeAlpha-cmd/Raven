@@ -3,7 +3,7 @@ import { lookupToken } from "@/lib/lookup";
 
 export const dynamic = "force-dynamic";
 
-/** GET /api/lookup?address=0x… — bonding-curve progress for one token. */
+/** GET /api/lookup?address=<mint> — bonding-curve progress for one token. */
 export async function GET(req: Request) {
   const address = new URL(req.url).searchParams.get("address") ?? "";
   try {

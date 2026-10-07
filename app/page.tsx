@@ -7,7 +7,7 @@ const views = [
     name: "Today",
     num: "01",
     tag: "the graduation calendar",
-    desc: "Every bonding curve on Pons, ranked by how close it is to the 8,090 USDG graduation line — and how fast it's moving.",
+    desc: "Every bonding curve on pump.fun, ranked by how close it is to the 85 SOL graduation line — and how fast it's moving.",
     accent: "amber" as const,
   },
   {
@@ -21,7 +21,7 @@ const views = [
     name: "Wallets",
     num: "03",
     tag: "the money in motion",
-    desc: "The most active wallets on Robinhood Chain, ranked by size. Watch where the money moves first.",
+    desc: "The most active wallets on Solana, ranked by size. Watch where the money moves first.",
     accent: "violet" as const,
   },
   {
@@ -114,7 +114,7 @@ export default function Landing() {
             <span aria-hidden="true" className="mr-1.5 text-amber-600 dark:text-amber-400">
               ▸
             </span>
-            Robinhood Chain // live terminal
+            Solana // live terminal
           </p>
           <h1 className="mx-auto mt-4 max-w-3xl text-5xl font-black leading-[1.02] tracking-tighter md:text-7xl">
             The tab that{" "}
@@ -123,7 +123,7 @@ export default function Landing() {
             </span>
           </h1>
           <p className="mx-auto mt-6 max-w-xl text-base font-medium leading-relaxed text-(--raven-muted) md:text-lg">
-            Raven keeps watch over Robinhood Chain — graduations, live trade
+            Raven keeps watch over Solana — graduations, live trade
             flow, and wallet signals, all on one screen.
           </p>
           <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
@@ -200,13 +200,13 @@ export default function Landing() {
               {
                 n: "01",
                 t: "INDEX",
-                d: "Raven reads Pons factory events and router swaps directly from Robinhood Chain's public RPC. No middlemen, no stale APIs.",
+                d: "Raven reads pump.fun curve events directly from Solana's public RPC. No middlemen, no stale APIs.",
                 c: "bg-amber-500",
               },
               {
                 n: "02",
                 t: "VERIFY",
-                d: "Graduation progress is computed from on-chain buys minus sells — the same math the curve uses. Nothing guessed.",
+                d: "Graduation progress is read straight from the on-chain bonding-curve account — the same state the program uses. Nothing guessed.",
                 c: "bg-emerald-500",
               },
               {
@@ -284,7 +284,7 @@ export default function Landing() {
           </div>
           <div className="flex flex-col items-center gap-2 md:items-end">
             <p className="font-mono text-[11px] font-bold text-(--raven-muted)">
-              built on Robinhood Chain · data from public RPC
+              built on Solana · data from public RPC
             </p>
             <a
               href="https://github.com/SupremeAlpha-cmd/Raven"

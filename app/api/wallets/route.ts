@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getWalletLeaderboard } from "@/lib/wallets";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 /** GET /api/wallets — most active wallets over the recent window. */
 export async function GET() {

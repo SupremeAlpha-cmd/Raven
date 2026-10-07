@@ -5,7 +5,7 @@ import type { Graduation, NearGraduation } from "@/lib/graduation";
 import { SignalTag, Meter, WatchLoading, EmptyScope } from "./raven-ui";
 import TokenLookup from "./TokenLookup";
 
-const EXPLORER = "https://robinhoodchain.blockscout.com";
+const EXPLORER = "https://solscan.io";
 const REFRESH_MS = 5 * 60_000;
 
 function timeAgo(ts: number): string {
@@ -80,7 +80,7 @@ function CrosshairCard({ t }: { t: NearGraduation }) {
       />
       <div className="mt-2.5 flex justify-between font-mono text-[11px] font-bold text-(--raven-muted)">
         <span>
-          {fmt(t.raised)} / {fmt(t.threshold)} USDG
+          {fmt(t.raised)} / {fmt(t.threshold)} SOL
         </span>
         <span>
           24h <span className="text-(--raven-ink)">+{fmt(t.velocity24h)}</span> velocity
@@ -124,7 +124,7 @@ function NearRow({ t, rank }: { t: NearGraduation; rank: number }) {
         />
         <div className="mt-1.5 flex justify-between font-mono text-[11px] text-(--raven-muted)">
           <span>
-            {fmt(t.raised)} / {fmt(t.threshold)} USDG
+            {fmt(t.raised)} / {fmt(t.threshold)} SOL
           </span>
           <span>
             24h <span className="font-bold text-(--raven-muted)">+{fmt(t.velocity24h)}</span>
@@ -245,8 +245,8 @@ export default function TodayView() {
         </div>
       )}
       <p className="px-4 py-4 font-mono text-[11px] leading-relaxed text-(--raven-muted)">
-        Graduation = 8,090 USDG net raised on the bonding curve. Progress is
-        computed from on-chain buys and sells.
+        Graduation = 85 SOL net raised on the bonding curve. Progress is
+        read straight from the on-chain bonding-curve account.
       </p>
     </div>
   );

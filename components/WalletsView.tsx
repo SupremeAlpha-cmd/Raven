@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { WalletStats } from "@/lib/wallets";
 import { SignalTag, WatchLoading, EmptyScope } from "./raven-ui";
 
-const EXPLORER = "https://robinhoodchain.blockscout.com";
+const EXPLORER = "https://solscan.io";
 
 function formatVolume(v: number): string {
   if (v >= 1_000_000) return (v / 1_000_000).toFixed(2) + "M";
@@ -50,7 +50,7 @@ function WalletRow({ w, rank }: { w: WalletStats; rank: number }) {
   const top3 = rank < 3;
   return (
     <a
-      href={`${EXPLORER}/address/${w.address}`}
+      href={`${EXPLORER}/account/${w.address}`}
       target="_blank"
       rel="noreferrer"
       className={`flex items-center gap-3 border-b border-(--raven-line)/70 px-4 py-3 transition-colors ${

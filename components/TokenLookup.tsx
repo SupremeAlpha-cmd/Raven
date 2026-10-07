@@ -4,7 +4,7 @@ import { useState } from "react";
 import type { LookupResult } from "@/lib/lookup";
 import { Meter, SignalTag } from "./raven-ui";
 
-const EXPLORER = "https://robinhoodchain.blockscout.com";
+const EXPLORER = "https://solscan.io";
 
 function fmt(n: number): string {
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(2) + "M";
@@ -60,7 +60,7 @@ export default function TokenLookup() {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && scan()}
-          placeholder="0x… token or curve address"
+          placeholder="paste a Solana mint address"
           spellCheck={false}
           aria-label="token address to look up"
           className="scope-corners min-w-0 flex-1 border-2 border-(--raven-ink) bg-(--raven-card) px-3 py-2 font-mono text-[13px] font-bold text-(--raven-ink) placeholder:text-(--raven-faint) outline-none focus:border-amber-500"
@@ -88,7 +88,7 @@ export default function TokenLookup() {
 
       {state.kind === "done" && !state.result.found && (
         <p className="mt-3 border-2 border-dashed border-(--raven-line) px-3 py-2.5 font-mono text-[12px] font-bold text-(--raven-muted)">
-          nothing on the scope — not a Pons bonding-curve launch
+          nothing on the scope — not a pump.fun bonding-curve launch
         </p>
       )}
 
@@ -151,7 +151,7 @@ function LookupCard({ t }: { t: Extract<LookupResult, { graduated: false }> }) {
       />
       <div className="mt-2.5 flex justify-between font-mono text-[11px] font-bold text-(--raven-muted)">
         <span>
-          {fmt(t.raised)} / {fmt(t.threshold)} USDG
+          {fmt(t.raised)} / {fmt(t.threshold)} SOL
         </span>
         <span>
           24h <span className="text-(--raven-ink)">+{fmt(t.velocity24h)}</span> velocity
@@ -160,7 +160,7 @@ function LookupCard({ t }: { t: Extract<LookupResult, { graduated: false }> }) {
       <p className="mt-1.5 font-mono text-[10px] text-(--raven-faint)">
         curve{" "}
         <a
-          href={`${EXPLORER}/address/${t.curve}`}
+          href={`${EXPLORER}/account/${t.curve}`}
           target="_blank"
           rel="noreferrer"
           className="underline hover:text-(--raven-muted)"

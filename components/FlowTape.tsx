@@ -5,7 +5,7 @@ import type { TapeEntry } from "@/lib/tape";
 import { SignalTag, TugMeter, WatchLoading, EmptyScope } from "./raven-ui";
 
 const REFRESH_MS = 30_000;
-const EXPLORER = "https://robinhoodchain.blockscout.com";
+const EXPLORER = "https://solscan.io";
 
 function timeAgo(ts: number): string {
   const secs = Math.max(0, Math.floor(Date.now() / 1000) - ts);

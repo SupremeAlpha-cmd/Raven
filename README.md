@@ -2,9 +2,9 @@
 
 **Raven watches the chain so you don't have to.**
 
-Tokens on Pons move fast. Something can go from quiet to gaining serious traction in a matter of minutes, and keeping up with everything on-chain isn't easy.
+Tokens on pump.fun move fast. Something can go from quiet to gaining serious traction in a matter of minutes, and keeping up with everything on-chain isn't easy.
 
-Raven is a live terminal for Robinhood Chain that tracks bonding curves, graduations, and smart-wallet activity as it happens.
+Raven is a live terminal for Solana that tracks bonding curves, graduations, and smart-wallet activity as it happens.
 
 - **Today** shows you what's moving, what's nearing graduation, and where momentum is building.
 - **Flow** lets you follow buys and sells in real time.
@@ -16,10 +16,10 @@ Instead of constantly checking different places to see what you missed, Raven gi
 
 ## How it works
 
-One indexing engine feeds all three views. It reads `Swap` events straight from the Pons router contract (`0x65050a9b7e5075a2ba5ced7b1b64ee66262c40dc`) via the Robinhood Chain RPC, correlates each swap with its ERC-20 transfers to identify tokens, traders, and direction, and serves it up through API routes. The frontend polls every 30 seconds — the tab that never closes.
+One indexing engine feeds all three views. It reads `TradeEvent`s straight from the pump.fun program (`6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P`) via Solana RPC — each event already carries mint, amounts, direction and trader, so no correlation step is needed — and serves it up through API routes. The frontend polls every 30 seconds — the tab that never closes.
 
-- Chain ID `4663` · RPC `https://rpc.mainnet.chain.robinhood.com`
-- `lib/chain.ts` — RPC client and chain constants
+- Solana mainnet-beta · RPC `https://api.mainnet-beta.solana.com` (or Helius with `HELIUS_API_KEY`)
+- `lib/solana.ts` — RPC client, program IDs, event decoders, curve math
 - `lib/tape.ts` — swap decoder (Flow)
 - `lib/wallets.ts` — wallet activity aggregation (Wallets)
 - `app/api/tape`, `app/api/wallets` — data endpoints
@@ -32,6 +32,12 @@ npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
+
+## Environment
+
+| Variable | Required | What |
+|---|---|---|
+| `HELIUS_API_KEY` | No | Helius RPC key. Without it Raven uses the public mainnet-beta endpoint, which is rate-limited — polls are slower and scans shallower. Set it for production. |
 
 ## Status
 

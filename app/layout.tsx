@@ -18,11 +18,11 @@ const siteUrl =
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   themeColor: "#fffdf7",
-  title: "Raven — what's happening on Robinhood Chain",  description:
-    "Raven watches the chain so you don't have to. Live graduations, trade flow, and wallet signals on Robinhood Chain.",
+  title: "Raven — what's happening on Solana",  description:
+    "Raven watches the chain so you don't have to. Live graduations, trade flow, and wallet signals on Solana.",
   icons: { icon: "/logo.png", apple: "/logo.png" },
   openGraph: {
-    title: "Raven — what's happening on Robinhood Chain",
+    title: "Raven — what's happening on Solana",
     description:
       "Raven watches the chain so you don't have to. Live graduations, trade flow, and wallet signals.",
     url: siteUrl,
@@ -32,7 +32,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Raven — what's happening on Robinhood Chain",
+    title: "Raven — what's happening on Solana",
     description: "Raven watches the chain so you don't have to.",
     images: ["/og.png"],
   },

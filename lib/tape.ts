@@ -1,33 +1,33 @@
 /**
- * The Raven tape: decodes Swap events from the pons router into
- * trader-readable buy/sell records.
+ * The Raven tape: pump.fun TradeEvents decoded into trader-readable
+ * buy/sell records.
  *
- * We deliberately avoid decoding the router's complex path tuple —
- * instead we correlate each swap with the ERC-20 Transfers in the same
- * transaction, matched by log proximity to the swap event. Amounts come
- * from the transfers themselves (on-chain fact); the event's amount words
- * are only a matching hint, since their denomination isn't reliable.
+ * Strictly simpler than the EVM version — every TradeEvent already carries
+ * mint, solAmount, tokenAmount, isBuy, user and timestamp, so there is no
+ * swap↔transfer correlation step and no receipt lookup. Trader identity is
+ * the event's `user` (== the tx fee payer).
  */
 
 import {
-  ROUTER,
-  STABLES,
-  SWAP_TOPIC,
-  TRANSFER_TOPIC,
-  addrFromTopic,
-  getLatestBlock,
-  getLogs,
-  hexToBigInt,
-  rpc,
-  rpcBatch,
-} from "./chain";
+  PUMP_PROGRAM,
+  QUOTES,
+  USDC_MINT,
+  WSOL_MINT,
+  decodePumpEvents,
+  getRecentSignatures,
+  getTokenMeta,
+  getTransactionsBatched,
+  withRetry,
+  type TokenMeta,
+  type TradeEvent,
+} from "./solana";
 
 export type Direction = "buy" | "sell" | "swap";
 
 export interface TapeEntry {
   txHash: string;
   blockNumber: number;
-  timestamp: number; // estimated, seconds
+  timestamp: number; // seconds, exact (blockTime)
   trader: string;
   direction: Direction;
   tokenIn: string;
@@ -42,64 +42,18 @@ export interface TapeEntry {
   amountOutDecimals: number;
 }
 
-interface Transfer {
-  token: string;
-  from: string;
-  to: string;
-  value: bigint;
-  logIndex: number;
-}
+// Re-exported so graduation/lookup keep their existing import path.
+export { getTokenMeta };
+export type { TokenMeta };
 
-export interface TokenMeta {
-  symbol: string;
-  decimals: number;
-}
-
-const metaCache = new Map<string, TokenMeta>();
-
-function decodeAbiString(hex: string): string {
-  // Standard ABI-encoded string: offset(32) length(32) data.
-  // Some tokens return bytes32 instead — handle that too.
-  const clean = hex.startsWith("0x") ? hex.slice(2) : hex;
-  if (clean.length === 64) {
-    return Buffer.from(clean, "hex").toString("utf8").replace(/\0+$/, "");
-  }
-  const len = parseInt(clean.slice(64, 128), 16);
-  const data = clean.slice(128, 128 + len * 2);
-  return Buffer.from(data, "hex").toString("utf8").replace(/\0+$/, "");
-}
-
-async function ethCall(to: string, data: string): Promise<string> {
-  return rpc<string>("eth_call", [{ to, data }, "latest"]);
-}
-
-export async function getTokenMeta(address: string): Promise<TokenMeta> {
-  const key = address.toLowerCase();
-  const cached = metaCache.get(key);
-  if (cached) return cached;
-  const fallback: TokenMeta = {
-    symbol: address.slice(0, 6) + "…" + address.slice(-4),
-    decimals: 18,
-  };
-  try {
-    const [decHex, symHex] = await Promise.all([
-      ethCall(address, "0x313ce567").catch(() => null), // decimals()
-      ethCall(address, "0x95d89b41").catch(() => null), // symbol()
-    ]);
-    const meta: TokenMeta = {
-      symbol:
-        symHex && symHex !== "0x"
-          ? decodeAbiString(symHex).trim().slice(0, 12) || fallback.symbol
-          : fallback.symbol,
-      decimals: decHex && decHex !== "0x" ? Number(hexToBigInt(decHex)) : 18,
-    };
-    if (meta.decimals > 36 || meta.decimals < 0) meta.decimals = 18;
-    metaCache.set(key, meta);
-    return meta;
-  } catch {
-    return fallback;
-  }
-}
+const QUOTE_DECIMALS: Record<string, number> = {
+  [WSOL_MINT]: 9,
+  [USDC_MINT]: 6,
+};
+const QUOTE_SYMBOL: Record<string, string> = {
+  [WSOL_MINT]: "SOL",
+  [USDC_MINT]: "USDC",
+};
 
 function formatAmount(raw: bigint, decimals: number): string {
   const neg = raw < BigInt(0);
@@ -125,217 +79,145 @@ function formatAmount(raw: bigint, decimals: number): string {
   return prefix + whole.toString() + (fracStr ? "." + fracStr : "");
 }
 
-function parseTransfer(log: {
-  address: string;
-  topics: string[];
-  data: string;
-  logIndex: string;
-}): Transfer | null {
-  if (log.topics.length < 3) return null;
-  return {
-    token: log.address.toLowerCase(),
-    from: addrFromTopic(log.topics[1]),
-    to: addrFromTopic(log.topics[2]),
-    value: hexToBigInt(log.data),
-    logIndex: Number(log.logIndex),
-  };
+interface RawTrade {
+  signature: string;
+  slot: number;
+  blockTime: number;
+  trade: TradeEvent;
+  quoteMint: string;
 }
 
 /**
- * Fetch and decode the most recent swaps from the router.
- * @param blockSpan how many blocks back to scan (default 300)
+ * Detect the quote mint of a trade from the transaction's token balances.
+ * USDC-quoted curves move USDC in the tx; SOL-quoted curves move native
+ * SOL (no SPL delta). No extra RPC — the balances ride along with the tx.
  */
-export async function getRecentSwaps(blockSpan = 300): Promise<{
+function detectQuoteMint(tx: {
+  meta?: {
+    preTokenBalances?: { mint: string; uiTokenAmount: { amount: string } }[];
+    postTokenBalances?: { mint: string; uiTokenAmount: { amount: string } }[];
+  } | null;
+}): string {
+  const meta = tx.meta;
+  if (!meta) return WSOL_MINT;
+  const pre = new Map<string, bigint>();
+  const post = new Map<string, bigint>();
+  for (const b of meta.preTokenBalances ?? []) {
+    if (b.mint !== USDC_MINT) continue;
+    try {
+      pre.set(b.mint, BigInt(b.uiTokenAmount.amount));
+    } catch { /* ignore */ }
+  }
+  for (const b of meta.postTokenBalances ?? []) {
+    if (b.mint !== USDC_MINT) continue;
+    try {
+      post.set(b.mint, (post.get(b.mint) ?? BigInt(0)) + BigInt(b.uiTokenAmount.amount));
+    } catch { /* ignore */ }
+  }
+  for (const [mint, amt] of pre) {
+    if ((post.get(mint) ?? BigInt(0)) !== amt) return USDC_MINT;
+  }
+  for (const [mint, amt] of post) {
+    if (!pre.has(mint) && amt !== BigInt(0)) return USDC_MINT;
+  }
+  return WSOL_MINT;
+}
+
+/**
+ * Fetch and decode the most recent pump.fun curve trades.
+ * @param limit how many recent program transactions to scan (default 120 —
+ *   tuned for public-RPC rate limits; raise with HELIUS_API_KEY set)
+ */
+export async function getRecentSwaps(limit = 120): Promise<{
   entries: TapeEntry[];
   latestBlock: number;
 }> {
-  const latest = await getLatestBlock();
-  const from = latest - blockSpan;
-
-  const [swapLogs, transferLogs, latestBlock, oldBlock] = await Promise.all([
-    getLogs(from, latest, ROUTER, [SWAP_TOPIC]),
-    getLogs(from, latest, null, [TRANSFER_TOPIC]),
-    rpc<{ timestamp: string }>("eth_getBlockByNumber", ["latest", false]),
-    rpc<{ timestamp: string }>("eth_getBlockByNumber", [
-      "0x" + from.toString(16),
-      false,
-    ]),
-  ]);
-
-  // Average block time over the window, for timestamp estimates.
-  const tLatest = parseInt(latestBlock.timestamp, 16);
-  const tOld = parseInt(oldBlock.timestamp, 16);
-  const avgBlockTime = blockSpan > 0 ? (tLatest - tOld) / blockSpan : 2;
-  const tsFor = (block: number) =>
-    Math.round(tLatest - (latest - block) * avgBlockTime);
-
-  // Group transfers by tx hash.
-  const transfersByTx = new Map<string, Transfer[]>();
-  for (const log of transferLogs) {
-    const t = parseTransfer(log);
-    if (!t) continue;
-    const list = transfersByTx.get(log.transactionHash) ?? [];
-    list.push(t);
-    transfersByTx.set(log.transactionHash, list);
-  }
-
-  // Trader identity comes from the transaction sender, NOT the event topics —
-  // the router's indexed params are zero for most swaps. One batched call.
-  const txHashes = [...new Set(swapLogs.map((l) => l.transactionHash))];
-  const receipts = await rpcBatch<{ from: string; transactionHash: string }>(
-    txHashes.map((h) => ({ method: "eth_getTransactionReceipt", params: [h] })),
+  const sigs = await getRecentSignatures(PUMP_PROGRAM, limit);
+  const ok = sigs.filter((s) => !s.err);
+  const signatures = ok.map((s) => s.signature);
+  const slotBySig = new Map(ok.map((s) => [s.signature, s.slot]));
+  const timeBySig = new Map(
+    ok.map((s) => [s.signature, s.blockTime ?? null]),
   );
-  const fromByTx = new Map<string, string>();
-  receipts.forEach((r, i) => {
-    if (r?.from) fromByTx.set(txHashes[i], r.from.toLowerCase());
+
+  const txBySig = await getTransactionsBatched(signatures, {
+    label: "getTransactions(tape)",
   });
 
-  const entries: TapeEntry[] = [];
-  const metasNeeded = new Set<string>();
-
-  interface RawEntry {
-    txHash: string;
-    blockNumber: number;
-    timestamp: number;
-    trader: string;
-    direction: Direction;
-    tokenIn: string;
-    amountInRaw: bigint;
-    tokenOut: string;
-    amountOutRaw: bigint;
-  }
-  const raw: RawEntry[] = [];
-
-  // A tx can carry several swaps — don't let two of them claim the same transfer.
-  const claimedByTx = new Map<string, Set<number>>();
-
-  for (const log of swapLogs) {
-    // Trader = tx sender. Fall back to indexed topic only if it's non-zero.
-    let trader = fromByTx.get(log.transactionHash);
-    if (!trader && log.topics.length > 1) {
-      const t = addrFromTopic(log.topics[1]);
-      if (t !== "0x0000000000000000000000000000000000000000") trader = t;
+  const raw: RawTrade[] = [];
+  for (const [sig, tx] of txBySig) {
+    const logs: string[] | null | undefined =
+      tx?.meta?.logMessages ?? tx?.meta?.["logMessages"];
+    const { trades } = decodePumpEvents(logs);
+    if (trades.length === 0) continue;
+    const blockTime =
+      tx.blockTime ?? timeBySig.get(sig) ?? Math.floor(Date.now() / 1000);
+    const quoteMint = detectQuoteMint(tx);
+    for (const trade of trades) {
+      raw.push({
+        signature: sig,
+        slot: slotBySig.get(sig) ?? 0,
+        blockTime,
+        trade,
+        quoteMint,
+      });
     }
-    if (!trader) continue;
-
-    const data = log.data.startsWith("0x") ? log.data.slice(2) : log.data;
-    if (data.length < 128) continue;
-    const amountIn = hexToBigInt("0x" + data.slice(0, 64));
-    const amountOut = hexToBigInt("0x" + data.slice(64, 128));
-    if (amountIn === BigInt(0) || amountOut === BigInt(0)) continue;
-
-    const txTransfers = transfersByTx.get(log.transactionHash) ?? [];
-    const swapIdx = Number(log.logIndex);
-    const routerLc = ROUTER.toLowerCase();
-    const zero = "0x0000000000000000000000000000000000000000";
-    const claimed = claimedByTx.get(log.transactionHash) ?? new Set<number>();
-    const fresh = (t: Transfer) => !claimed.has(t.logIndex);
-    // The transfers nearest the swap event are its legs. "Largest amount"
-    // matching misattributes when a tx carries several swaps or a big
-    // unrelated move — that produced phantom billion-dollar payouts.
-    const byProximity = (cands: Transfer[]) =>
-      cands.sort(
-        (a, b) =>
-          Math.abs(a.logIndex - swapIdx) - Math.abs(b.logIndex - swapIdx),
-      );
-
-    // tokenOut: the payout leg. Exact event-amount match first, then nearest.
-    const outCands = byProximity(
-      txTransfers.filter(
-        (t) => t.to !== routerLc && t.to !== zero && t.from !== trader && fresh(t),
-      ),
-    );
-    const outLeg =
-      outCands.find((t) => t.to === trader && t.value === amountOut) ??
-      outCands.find((t) => t.to === trader) ??
-      outCands[0] ??
-      null;
-
-    // tokenIn: the spend leg. Exact event-amount match first, then nearest.
-    // Falls back to the nearest payment into the router (covers ETH->WETH
-    // deposits where no trader outflow exists).
-    const inCands = byProximity(
-      txTransfers.filter((t) => t.from === trader && fresh(t)),
-    );
-    const inLeg =
-      inCands.find((t) => t.value === amountIn) ??
-      inCands[0] ??
-      byProximity(txTransfers.filter((t) => t.to === routerLc && fresh(t)))[0] ??
-      null;
-
-    if (!outLeg || !inLeg) continue;
-    // Legs far from the swap event are dubious correlations, not trades.
-    if (Math.abs(outLeg.logIndex - swapIdx) > 200) continue;
-    if (Math.abs(inLeg.logIndex - swapIdx) > 200) continue;
-    // Same token both sides = correlation failure, not a real trade.
-    if (inLeg.token === outLeg.token) continue;
-    claimed.add(outLeg.logIndex);
-    claimed.add(inLeg.logIndex);
-    claimedByTx.set(log.transactionHash, claimed);
-
-    const tokenIn = inLeg.token;
-    const tokenOut = outLeg.token;
-    const direction: Direction = STABLES.has(tokenIn)
-      ? "buy"
-      : STABLES.has(tokenOut)
-        ? "sell"
-        : "swap";
-
-    metasNeeded.add(tokenIn);
-    metasNeeded.add(tokenOut);
-
-    // Amounts come from the transfers themselves (on-chain fact), not the
-    // event words — the event's denomination isn't reliable across swaps.
-    raw.push({
-      txHash: log.transactionHash,
-      blockNumber: parseInt(log.blockNumber, 16),
-      timestamp: tsFor(parseInt(log.blockNumber, 16)),
-      trader,
-      direction,
-      tokenIn,
-      amountInRaw: inLeg.value,
-      tokenOut,
-      amountOutRaw: outLeg.value,
-    });
   }
 
   // Resolve metadata for tokens in this batch (cached across calls).
+  const metasNeeded = new Set<string>();
+  for (const r of raw) metasNeeded.add(r.trade.mint);
   const metas = new Map<string, TokenMeta>();
   await Promise.all(
-    [...metasNeeded].map(async (a) => metas.set(a, await getTokenMeta(a))),
+    [...metasNeeded].map(async (m) => metas.set(m, await getTokenMeta(m))),
   );
 
+  const entries: TapeEntry[] = [];
   for (const r of raw) {
-    const inMeta = metas.get(r.tokenIn)!;
-    const outMeta = metas.get(r.tokenOut)!;
-    // Backstop: no Pons trade moves a billion dollars in one leg.
-    // Anything that large is a correlation artifact, not a trade.
-    const inQuote =
-      STABLES.has(r.tokenIn) &&
-      Number(r.amountInRaw) / 10 ** inMeta.decimals > 1e9;
-    const outQuote =
-      STABLES.has(r.tokenOut) &&
-      Number(r.amountOutRaw) / 10 ** outMeta.decimals > 1e9;
-    if (inQuote || outQuote) continue;
+    const t = r.trade;
+    const qDec = QUOTE_DECIMALS[r.quoteMint] ?? 9;
+    const qSym = QUOTE_SYMBOL[r.quoteMint] ?? "SOL";
+    const mMeta = metas.get(t.mint)!;
+
+    const isBuy = t.isBuy;
+    const tokenIn = isBuy ? r.quoteMint : t.mint;
+    const tokenOut = isBuy ? t.mint : r.quoteMint;
+    const amountInRaw = isBuy ? t.solAmount : t.tokenAmount;
+    const amountOutRaw = isBuy ? t.tokenAmount : t.solAmount;
+    const inDecimals = isBuy ? qDec : mMeta.decimals;
+    const outDecimals = isBuy ? mMeta.decimals : qDec;
+    const inSymbol = isBuy ? qSym : mMeta.symbol;
+    const outSymbol = isBuy ? mMeta.symbol : qSym;
+
+    if (amountInRaw === BigInt(0) || amountOutRaw === BigInt(0)) continue;
+
+    // Backstop: no pump.fun trade moves a billion dollars in one leg.
+    const inQuoteUsd =
+      QUOTES.has(tokenIn) && Number(amountInRaw) / 10 ** inDecimals > 1e9;
+    const outQuoteUsd =
+      QUOTES.has(tokenOut) && Number(amountOutRaw) / 10 ** outDecimals > 1e9;
+    if (inQuoteUsd || outQuoteUsd) continue;
+
     entries.push({
-      txHash: r.txHash,
-      blockNumber: r.blockNumber,
-      timestamp: r.timestamp,
-      trader: r.trader,
-      direction: r.direction,
-      tokenIn: r.tokenIn,
-      tokenInSymbol: inMeta.symbol,
-      amountIn: formatAmount(r.amountInRaw, inMeta.decimals),
-      amountInRaw: r.amountInRaw.toString(),
-      amountInDecimals: inMeta.decimals,
-      tokenOut: r.tokenOut,
-      tokenOutSymbol: outMeta.symbol,
-      amountOut: formatAmount(r.amountOutRaw, outMeta.decimals),
-      amountOutRaw: r.amountOutRaw.toString(),
-      amountOutDecimals: outMeta.decimals,
+      txHash: r.signature,
+      blockNumber: r.slot,
+      timestamp: r.blockTime,
+      trader: t.user,
+      direction: isBuy ? "buy" : "sell",
+      tokenIn,
+      tokenInSymbol: inSymbol,
+      amountIn: formatAmount(amountInRaw, inDecimals),
+      amountInRaw: amountInRaw.toString(),
+      amountInDecimals: inDecimals,
+      tokenOut,
+      tokenOutSymbol: outSymbol,
+      amountOut: formatAmount(amountOutRaw, outDecimals),
+      amountOutRaw: amountOutRaw.toString(),
+      amountOutDecimals: outDecimals,
     });
   }
 
   entries.sort((a, b) => b.blockNumber - a.blockNumber);
-  return { entries, latestBlock: latest };
+  const latestBlock = ok.length > 0 ? Math.max(...ok.map((s) => s.slot)) : 0;
+  return { entries, latestBlock };
 }

@@ -114,12 +114,12 @@ export function AlertsProvider({ children }: { children: ReactNode }) {
       const entries: TapeEntry[] = tape?.entries ?? [];
 
       const fresh = [
-        ...evaluateAlerts(
+        ...(await evaluateAlerts(
           rulesRef.current,
           nearing,
           entries,
           firedKeys.current,
-        ),
+        )),
         ...detectLaunches(nearing, seenTokens.current, seeded.current),
       ];
       seeded.current = true;

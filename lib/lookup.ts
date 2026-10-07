@@ -1,39 +1,35 @@
 /**
- * Token lookup slice: paste a token (or curve) address, see how far its
+ * Token lookup slice: paste a mint address, see how far its
  * bonding curve has gone.
  *
- * Reads Pons launch mechanics straight from the chain (see
- * forensics/graduation.md and lib/graduation.ts):
- *  - getLaunchedToken(token) → word 1 = curve, word 5 = graduationThreshold,
- *    word 6 = phase
- *  - progress = (Σ CurveBuy.w0 − Σ CurveSell.w1) / threshold  (quote raised)
+ * Reads pump.fun mechanics straight from Solana:
+ *  - the BondingCurve PDA gives the graduated flag (`complete`)
+ *    plus virtual SOL reserves → progress = net SOL raised / 85 SOL
+ *  - 24h velocity from the mint's own signature history (TradeEvents)
  *
- * Honest boundaries: only USDG-paired curves get a progress number (that's
- * Raven's whole graduation framing); non-Pons addresses return found:false;
- * graduated tokens report their phase instead of a fake progress.
+ * Honest boundaries: only SOL-denominated curves get a progress number
+ * (that's Raven's whole graduation framing); non-pump.fun mints return
+ * found:false; graduated tokens report "graduated" instead of a progress.
  */
 
 import {
-  CURVE_BUY_TOPIC,
-  CURVE_SELL_TOPIC,
-  FACTORY,
-  GET_LAUNCHED_TOKEN,
-  TOKEN_LAUNCHED_TOPIC,
-  word,
-  type NearGraduation,
-} from "./graduation";
-import { USDG, addrFromTopic, getLatestBlock, getLogs, rpc } from "./chain";
+  GRADUATION_NET_SOL_LAMPORTS,
+  LAMPORTS_PER_SOL,
+  bondingCurvePda,
+  curveProgress,
+  decodePumpEvents,
+  getBondingCurve,
+  getRecentSignatures,
+  getTransactionsBatched,
+  isValidAddress,
+  netSolRaised,
+} from "./solana";
 import { getTokenMeta } from "./tape";
-
-// The RPC caps eth_getLogs at 10M blocks per request — one call covers any
-// realistic curve age.
-const TAPE_LOOKBACK = 10_000_000;
+import type { NearGraduation } from "./graduation";
 
 export const PHASE_LABELS: Record<number, string> = {
   0: "climbing",
-  1: "swept",
-  2: "pool created",
-  3: "rescued",
+  1: "graduated",
 };
 
 export type LookupResult =
@@ -51,127 +47,65 @@ export type LookupResult =
       graduated: false;
     } & NearGraduation);
 
-interface LaunchInfo {
-  token: string;
-  curve: string;
-  threshold: bigint;
-  phase: number;
-  pairToken: string;
-}
-
-async function launchedTokenCall(token: string): Promise<LaunchInfo | null> {
-  const res = await rpc<string>("eth_call", [
-    {
-      to: FACTORY,
-      data: GET_LAUNCHED_TOKEN + "0".repeat(24) + token.slice(2).toLowerCase(),
-    },
-    "latest",
-  ]);
-  if (!res || res === "0x") return null;
-  const threshold = word(res, 5);
-  if (threshold === BigInt(0)) return null; // not a Pons launch
-  return {
-    token: token.toLowerCase(),
-    curve: ("0x" + word(res, 1).toString(16).padStart(40, "0")).toLowerCase(),
-    threshold,
-    phase: Number(word(res, 6)),
-    pairToken: ("0x" + word(res, 4).toString(16).padStart(40, "0")).toLowerCase(),
-  };
-}
-
-/** Resolve a curve address back to its token via the launch log. */
-async function tokenForCurve(
-  curve: string,
-  latest: number,
-): Promise<string | null> {
-  const from = Math.max(0, latest - TAPE_LOOKBACK);
-  const logs = await getLogs(from, latest, FACTORY, [
-    TOKEN_LAUNCHED_TOPIC,
-    null,
-    "0x" + "0".repeat(24) + curve.slice(2).toLowerCase(),
-  ]);
-  if (logs.length === 0) return null;
-  logs.sort(
-    (a, b) => parseInt(b.blockNumber, 16) - parseInt(a.blockNumber, 16),
-  );
-  return addrFromTopic(logs[0].topics[1]);
-}
+const GRADUATION_SOL = GRADUATION_NET_SOL_LAMPORTS / LAMPORTS_PER_SOL; // 85
 
 export async function lookupToken(raw: string): Promise<LookupResult> {
-  const address = raw.trim().toLowerCase();
-  if (!/^0x[0-9a-f]{40}$/.test(address)) {
-    throw new Error("not an address — paste a 0x contract address");
+  const mint = raw.trim();
+  if (!isValidAddress(mint)) {
+    throw new Error("not an address — paste a base58 mint address");
   }
 
-  // 1. Token first, curve second.
-  let info = await launchedTokenCall(address);
-  if (!info) {
-    const latest = await getLatestBlock();
-    const token = await tokenForCurve(address, latest);
-    if (!token) return { found: false };
-    info = await launchedTokenCall(token);
-    if (!info) return { found: false };
-  }
+  // 1. The curve PDA either exists (pump.fun launch) or it doesn't.
+  const state = await getBondingCurve(mint).catch(() => null);
+  if (!state) return { found: false };
 
-  const meta = await getTokenMeta(info.token);
+  const meta = await getTokenMeta(mint);
+  const curve = bondingCurvePda(mint).toBase58();
 
-  // 2. Graduated (or otherwise past phase 0): report the phase, no fake curve.
-  if (info.phase !== 0) {
+  // 2. Graduated: report it, no fake progress curve.
+  if (state.complete) {
     return {
       found: true,
       graduated: true,
-      token: info.token,
+      token: mint,
       symbol: meta.symbol,
-      phase: info.phase,
-      phaseLabel: PHASE_LABELS[info.phase] ?? `phase ${info.phase}`,
+      phase: 1,
+      phaseLabel: PHASE_LABELS[1],
     };
   }
 
-  // 3. Only USDG pairs get a progress number — that's Raven's graduation math.
-  if (info.pairToken !== USDG.toLowerCase()) {
-    throw new Error("not a USDG curve — Raven only tracks USDG graduations");
+  // 3. 24h buy velocity from the mint's own history (targeted, cheap).
+  const now = Math.floor(Date.now() / 1000);
+  let velocity = 0;
+  try {
+    const sigs = await getRecentSignatures(mint, 200);
+    const okSigs = sigs.filter((s) => !s.err).map((s) => s.signature);
+    const txBySig = await getTransactionsBatched(okSigs, {
+      label: "getTransactions(lookup)",
+    });
+    for (const [, tx] of txBySig) {
+      const blockTime = tx.blockTime ?? now;
+      if (blockTime < now - 86400) continue;
+      const { trades } = decodePumpEvents(tx.meta?.logMessages);
+      for (const t of trades) {
+        if (t.mint === mint && t.isBuy) {
+          velocity += Number(t.solAmount) / LAMPORTS_PER_SOL;
+        }
+      }
+    }
+  } catch {
+    // Velocity is a nice-to-have; progress is the point.
   }
-
-  // 4. Progress from the curve's own tape, same math as the Today scan.
-  const latest = await getLatestBlock();
-  const from = Math.max(0, latest - TAPE_LOOKBACK);
-  const [bLatest, bOld] = await Promise.all([
-    rpc<{ timestamp: string }>("eth_getBlockByNumber", ["latest", false]),
-    rpc<{ timestamp: string }>("eth_getBlockByNumber", [
-      "0x" + (latest - 1000).toString(16),
-      false,
-    ]),
-  ]);
-  const avgBlockTime = Math.max(
-    1,
-    (parseInt(bLatest.timestamp, 16) - parseInt(bOld.timestamp, 16)) / 1000,
-  );
-  const blocks24h = Math.round(86400 / avgBlockTime);
-
-  const [buys, sells] = await Promise.all([
-    getLogs(from, latest, info.curve, [CURVE_BUY_TOPIC]),
-    getLogs(from, latest, info.curve, [CURVE_SELL_TOPIC]),
-  ]);
-  let buySum = BigInt(0);
-  let velSum = BigInt(0);
-  for (const b of buys) {
-    const w0 = word(b.data, 0);
-    buySum += w0;
-    if (parseInt(b.blockNumber, 16) >= latest - blocks24h) velSum += w0;
-  }
-  let sellSum = BigInt(0);
-  for (const s of sells) sellSum += word(s.data, 1);
-  const raised = buySum - sellSum;
 
   return {
     found: true,
     graduated: false,
-    token: info.token,
+    token: mint,
     symbol: meta.symbol,
-    curve: info.curve,
-    progress: Number((raised * BigInt(10_000)) / info.threshold) / 10_000,
-    raised: Number(raised) / 1e6,
-    threshold: Number(info.threshold) / 1e6,
-    velocity24h: Number(velSum) / 1e6,
+    curve,
+    progress: curveProgress(state),
+    raised: Math.max(0, netSolRaised(state)),
+    threshold: GRADUATION_SOL,
+    velocity24h: velocity,
   };
 }

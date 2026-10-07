@@ -1,65 +1,57 @@
 /**
  * Today slice: the graduation calendar.
  *
- * Reads Pons launch mechanics straight from the chain (see
- * forensics/graduation.md):
- *  - TokenLaunched on the factory enumerates bonding-curve launches
- *  - getLaunchedToken(token) gives phase + graduationThreshold
- *  - progress = (Σ CurveBuy.w0 − Σ CurveSell.w1) / threshold  (quote raised)
- *  - PoolGraduated on the factory = the graduation calendar itself
+ * Reads pump.fun mechanics straight from Solana (the Pons-factory
+ * equivalent):
+ *  - CreateEvent on the pump program enumerates bonding-curve launches
+ *  - the BondingCurve PDA account gives the graduated flag (`complete`)
+ *    plus virtual SOL reserves → progress = net SOL raised / 85 SOL
+ *  - CompleteEvent on the pump program = the graduation calendar itself
  *
- * Results are cached in-memory for 5 minutes — a full scan is dozens of
- * RPC calls and graduations move slowly.
+ * Results are cached in-memory for 5 minutes — a full scan is hundreds
+ * of RPC calls and graduations move slowly.
+ *
+ * Honest boundary (mirrors the old USDG-only rule): graduation progress
+ * is computed for SOL-denominated curves. USDC-quoted curves are rare;
+ * their trades still appear on the Flow tape.
  */
 
 import {
-  USDG,
-  addrFromTopic,
-  getLatestBlock,
-  getLogs,
-  hexToBigInt,
-  rpc,
-  rpcBatch,
-} from "./chain";
-import { getTokenMeta } from "./tape";
+  GRADUATION_NET_SOL_LAMPORTS,
+  LAMPORTS_PER_SOL,
+  PUMP_PROGRAM,
+  bondingCurvePda,
+  curveProgress,
+  decodePumpEvents,
+  getBondingCurve,
+  getRecentSignatures,
+  getTokenMeta,
+  getTransactionsBatched,
+  netSolRaised,
+  type TradeEvent,
+} from "./solana";
 
-export const FACTORY = "0x7ed598bcef8bd9edd8c97a195c6d13f40801ec7e";
-export const TOKEN_LAUNCHED_TOPIC =
-  "0x8d4aad4953d0ca700d468f3753aa14432d1b35b43ec6409f051fb6aa43a89607";
-const POOL_GRADUATED_TOPIC =
-  "0x0a44ef75df69c534f43cd6c1aa3ef8983065fe5fe79ef9e79f6494e6f258c259";
-export const CURVE_BUY_TOPIC =
-  "0xec36bf571f136799e8dc0b0b8bea4b04d8bd3d43de838aab0d5fc21d4cbfc455";
-export const CURVE_SELL_TOPIC =
-  "0x8113d738abdcb6b38357e9d53a54a7157861a09031b453651f0fe7fe151f59df";
-export const GET_LAUNCHED_TOKEN = "0x3cf28b5a"; // getLaunchedToken(address)
-
-const SCAN_BLOCKS = 200_000; // launch + graduation lookback
 const MAX_CURVES = 25; // per-scan cap; most recent launches first
 const CACHE_TTL_MS = 5 * 60_000;
+const GRADUATION_SOL = GRADUATION_NET_SOL_LAMPORTS / LAMPORTS_PER_SOL; // 85
 
 export interface NearGraduation {
   token: string;
   symbol: string;
   curve: string;
   progress: number; // 0..1
-  raised: number; // USDG
-  threshold: number; // USDG
-  velocity24h: number; // USDG of buys in the last 24h
+  raised: number; // SOL
+  threshold: number; // SOL (85)
+  velocity24h: number; // SOL of buys in the last 24h
 }
 
 export interface Graduation {
   token: string;
   symbol: string;
-  blockNumber: number;
+  blockNumber: number; // slot
   timestamp: number;
-  pairAmount: number; // in pair-token units
-  pair: "USDG" | "native";
-}
-
-export function word(data: string, i: number): bigint {
-  const clean = data.startsWith("0x") ? data.slice(2) : data;
-  return hexToBigInt("0x" + clean.slice(i * 64, (i + 1) * 64));
+  pairAmount: number; // SOL seeded into the PumpSwap pool (~85)
+  pair: "SOL" | "USDC";
 }
 
 let cache: { at: number; data: { nearing: NearGraduation[]; graduated: Graduation[] } } | null =
@@ -86,152 +78,122 @@ export async function getToday(): Promise<{
   }
 }
 
+interface ScannedTrade extends TradeEvent {
+  blockTime: number;
+}
+
 async function buildToday(): Promise<{
   nearing: NearGraduation[];
   graduated: Graduation[];
 }> {
+  const now = Math.floor(Date.now() / 1000);
 
-  const latest = await getLatestBlock();
-  const from = Math.max(0, latest - SCAN_BLOCKS);
+  // One program-history scan feeds launches, graduations AND 24h velocity.
+  // 350 signatures ≈ the recent pump.fun window; the 5-min cache absorbs
+  // the fetch cost. Raise with HELIUS_API_KEY set.
+  const sigs = await getRecentSignatures(PUMP_PROGRAM, 350);
+  const ok = sigs.filter((s) => !s.err);
+  const signatures = ok.map((s) => s.signature);
+  const timeBySig = new Map(ok.map((s) => [s.signature, s.blockTime ?? null]));
+  const slotBySig = new Map(ok.map((s) => [s.signature, s.slot]));
 
-  // Measured block time (don't assume).
-  const [bLatest, bOld] = await Promise.all([
-    rpc<{ timestamp: string }>("eth_getBlockByNumber", ["latest", false]),
-    rpc<{ timestamp: string }>("eth_getBlockByNumber", [
-      "0x" + (latest - 1000).toString(16),
-      false,
-    ]),
-  ]);
-  const avgBlockTime = Math.max(
-    1,
-    (parseInt(bLatest.timestamp, 16) - parseInt(bOld.timestamp, 16)) / 1000,
-  );
-  const blocks24h = Math.round(86400 / avgBlockTime);
-  const tsFor = (block: number) =>
-    Math.round(parseInt(bLatest.timestamp, 16) - (latest - block) * avgBlockTime);
+  const creates = new Map<string, { symbol: string; slot: number }>();
+  const completes: { mint: string; slot: number; blockTime: number }[] = [];
+  const tradesByMint = new Map<string, ScannedTrade[]>();
 
-  // 1. Enumerate launches.
-  const launchLogs = await getLogs(from, latest, FACTORY, [TOKEN_LAUNCHED_TOPIC]);
-  const launches = launchLogs
-    .map((l) => ({
-      token: addrFromTopic(l.topics[1]),
-      curve: addrFromTopic(l.topics[2]),
-      pairToken: ("0x" + word(l.data, 0).toString(16).padStart(40, "0")).toLowerCase(),
-      blockNumber: parseInt(l.blockNumber, 16),
-    }))
-    .filter((l) => l.pairToken === USDG.toLowerCase())
-    .sort((a, b) => b.blockNumber - a.blockNumber);
-
-  // 2. Keep only ungraduated (phase 0), most recent first.
-  // Phase checks go out in small chunks — the RPC 429s large batches.
-  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-  const infos: ({ phase: number; threshold: bigint } | null)[] = [];
-  for (let i = 0; i < launches.length; i += 20) {
-    const chunk = launches.slice(i, i + 20);
-    // Raw struct: word 5 = graduationThreshold, word 6 = phase.
-    const res = await rpcBatch<string>(
-      chunk.map((l) => ({
-        method: "eth_call",
-        params: [
-          {
-            to: FACTORY,
-            data: GET_LAUNCHED_TOKEN + "0".repeat(24) + l.token.slice(2),
-          },
-          "latest",
-        ],
-      })),
+  const txBySig = await getTransactionsBatched(signatures, {
+    label: "getTransactions(today)",
+  });
+  for (const [sig, tx] of txBySig) {
+    const blockTime = tx.blockTime ?? timeBySig.get(sig) ?? now;
+    const { trades, creates: ce, completes: co } = decodePumpEvents(
+      tx.meta?.logMessages,
     );
-    infos.push(
-      ...res.map((r) =>
-        !r || r === "0x"
-          ? null
-          : { threshold: word(r, 5), phase: Number(word(r, 6)) },
-      ),
-    );
-    if (i + 20 < launches.length) await sleep(400);
-  }
-  const active = launches
-    .map((l, i) => ({ ...l, info: infos[i] }))
-    .filter((l) => l.info && l.info.phase === 0)
-    .slice(0, MAX_CURVES);
-
-  // 3. Progress + velocity per curve.
-  const nearing: NearGraduation[] = [];
-  for (const l of active) {
-    const [buys, sells] = await Promise.all([
-      getLogs(l.blockNumber, latest, l.curve, [CURVE_BUY_TOPIC]),
-      getLogs(l.blockNumber, latest, l.curve, [CURVE_SELL_TOPIC]),
-    ]);
-    let buySum = BigInt(0);
-    let velSum = BigInt(0);
-    for (const b of buys) {
-      const w0 = word(b.data, 0);
-      buySum += w0;
-      if (parseInt(b.blockNumber, 16) >= latest - blocks24h) velSum += w0;
+    for (const c of ce) {
+      // Signatures come newest-first: first sighting wins.
+      if (!creates.has(c.mint)) {
+        creates.set(c.mint, {
+          symbol: c.symbol || c.mint.slice(0, 6),
+          slot: slotBySig.get(sig) ?? 0,
+        });
+      }
     }
-    let sellSum = BigInt(0);
-    for (const s of sells) sellSum += word(s.data, 1);
-    const raised = buySum - sellSum;
-    const threshold = l.info!.threshold;
-    if (threshold === BigInt(0)) continue;
-    const meta = await getTokenMeta(l.token);
-    nearing.push({
-      token: l.token,
-      symbol: meta.symbol,
-      curve: l.curve,
-      progress: Number((raised * BigInt(10_000)) / threshold) / 10_000,
-      raised: Number(raised) / 1e6,
-      threshold: Number(threshold) / 1e6,
-      velocity24h: Number(velSum) / 1e6,
-    });
+    for (const c of co) {
+      completes.push({
+        mint: c.mint,
+        slot: slotBySig.get(sig) ?? 0,
+        blockTime,
+      });
+    }
+    for (const t of trades) {
+      const list = tradesByMint.get(t.mint) ?? [];
+      list.push({ ...t, blockTime });
+      tradesByMint.set(t.mint, list);
+    }
+  }
+
+  // 24h buy velocity per mint, from the same scan.
+  const velocityByMint = new Map<string, number>();
+  for (const [mint, trades] of tradesByMint) {
+    let vel = 0;
+    for (const t of trades) {
+      if (t.isBuy && t.blockTime >= now - 86400) {
+        vel += Number(t.solAmount) / LAMPORTS_PER_SOL;
+      }
+    }
+    if (vel > 0) velocityByMint.set(mint, vel);
+  }
+
+  // Progress per recent launch, straight from the curve PDA.
+  // Small concurrency to stay friendly to public RPC.
+  const mints = [...creates.keys()].slice(0, 60);
+  const nearing: NearGraduation[] = [];
+  const CONC = 5;
+  for (let i = 0; i < mints.length; i += CONC) {
+    const batch = mints.slice(i, i + CONC);
+    const states = await Promise.all(
+      batch.map((mint) => getBondingCurve(mint).catch(() => null)),
+    );
+    for (let k = 0; k < batch.length; k++) {
+      const state = states[k];
+      if (!state || state.complete) continue; // graduated or gone
+      const mint = batch[k];
+      const meta = await getTokenMeta(mint);
+      nearing.push({
+        token: mint,
+        symbol: meta.symbol,
+        curve: bondingCurvePda(mint).toBase58(),
+        progress: curveProgress(state),
+        raised: Math.max(0, netSolRaised(state)),
+        threshold: GRADUATION_SOL,
+        velocity24h: velocityByMint.get(mint) ?? 0,
+      });
+      if (nearing.length >= MAX_CURVES) break;
+    }
+    if (nearing.length >= MAX_CURVES) break;
+    if (i + CONC < mints.length) {
+      await new Promise((r) => setTimeout(r, 200));
+    }
   }
   nearing.sort((a, b) => b.progress - a.progress);
 
-  // 4. Recent graduations (USDG and native pairs, labeled honestly).
-  const gradLogs = await getLogs(from, latest, FACTORY, [POOL_GRADUATED_TOPIC]);
-  const gradTokens = gradLogs.map((g) => addrFromTopic(g.topics[1]));
-  const pairTokens: (string | null)[] = [];
-  for (let i = 0; i < gradTokens.length; i += 20) {
-    const chunk = gradTokens.slice(i, i + 20);
-    const res = await rpcBatch<string>(
-      chunk.map((t) => ({
-        method: "eth_call",
-        params: [
-          {
-            to: FACTORY,
-            data: GET_LAUNCHED_TOKEN + "0".repeat(24) + t.slice(2),
-          },
-          "latest",
-        ],
-      })),
-    );
-    pairTokens.push(
-      ...res.map((r) =>
-        !r || r === "0x"
-          ? null
-          : "0x" + word(r, 4).toString(16).padStart(40, "0"),
-      ),
-    );
-    if (i + 20 < gradTokens.length) await sleep(400);
-  }
+  // Recent graduations (newest first, cap 20).
+  const seen = new Set<string>();
   const graduated: Graduation[] = [];
-  for (let i = 0; i < gradLogs.length; i++) {
-    const g = gradLogs[i];
-    const token = gradTokens[i];
-    const pair = pairTokens[i];
-    const isUsdg = pair?.toLowerCase() === USDG.toLowerCase();
-    const raw = word(g.data, 2);
-    const meta = await getTokenMeta(token);
+  for (const c of completes) {
+    if (seen.has(c.mint)) continue;
+    seen.add(c.mint);
+    const meta = await getTokenMeta(c.mint);
     graduated.push({
-      token,
+      token: c.mint,
       symbol: meta.symbol,
-      blockNumber: parseInt(g.blockNumber, 16),
-      timestamp: tsFor(parseInt(g.blockNumber, 16)),
-      pairAmount: Number(raw) / (isUsdg ? 1e6 : 1e18),
-      pair: isUsdg ? "USDG" : "native",
+      blockNumber: c.slot,
+      timestamp: c.blockTime,
+      pairAmount: GRADUATION_SOL,
+      pair: "SOL",
     });
+    if (graduated.length >= 20) break;
   }
-  graduated.sort((a, b) => b.blockNumber - a.blockNumber);
 
-  return { nearing, graduated: graduated.slice(0, 20) };
+  return { nearing, graduated };
 }

@@ -1,12 +1,12 @@
 /**
- * Wallets slice: turns the swap tape into a per-wallet activity leaderboard.
+ * Wallets slice: turns the trade tape into a per-wallet activity leaderboard.
  *
  * Honest labeling: this ranks wallets by *activity* (quote-denominated
  * volume + trade count) over the recent window. It does not claim
  * profitability — PnL needs price history, which comes later.
  */
 
-import { STABLES } from "./chain";
+import { QUOTES } from "./solana";
 import { getRecentSwaps } from "./tape";
 
 export interface WalletStats {
@@ -14,10 +14,10 @@ export interface WalletStats {
   trades: number;
   buys: number;
   sells: number;
-  /** quote-denominated volume (USDG/WETH legs), in native units */
+  /** quote-denominated volume (SOL/USDC legs), in native units */
   quoteVolume: number;
   topToken: string;
-  lastActive: number; // estimated timestamp, seconds
+  lastActive: number; // timestamp, seconds
 }
 
 function toUnits(raw: string, decimals: number): number {
@@ -29,7 +29,7 @@ export async function getWalletLeaderboard(limit = 25): Promise<{
   tradersSeen: number;
   latestBlock: number;
 }> {
-  const { entries, latestBlock } = await getRecentSwaps(300);
+  const { entries, latestBlock } = await getRecentSwaps();
   const map = new Map<string, WalletStats & { tokenCounts: Map<string, number> }>();
 
   for (const e of entries) {
@@ -51,14 +51,14 @@ export async function getWalletLeaderboard(limit = 25): Promise<{
     if (e.direction === "buy") w.buys += 1;
     if (e.direction === "sell") w.sells += 1;
     // Volume counts the quote-asset legs (what they spent or received).
-    if (STABLES.has(e.tokenIn)) {
+    if (QUOTES.has(e.tokenIn)) {
       w.quoteVolume += toUnits(e.amountInRaw, e.amountInDecimals);
     }
-    if (STABLES.has(e.tokenOut)) {
+    if (QUOTES.has(e.tokenOut)) {
       w.quoteVolume += toUnits(e.amountOutRaw, e.amountOutDecimals);
     }
     // Top token = the non-quote token they touched most.
-    const meme = STABLES.has(e.tokenIn) ? e.tokenOutSymbol : e.tokenInSymbol;
+    const meme = QUOTES.has(e.tokenIn) ? e.tokenOutSymbol : e.tokenInSymbol;
     w.tokenCounts.set(meme, (w.tokenCounts.get(meme) ?? 0) + 1);
     if (e.timestamp > w.lastActive) w.lastActive = e.timestamp;
   }

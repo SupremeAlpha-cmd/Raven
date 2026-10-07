@@ -4,7 +4,7 @@
  *
  * Rule types (MVP — three, deliberately not a rules engine):
  *  - graduation: a token crosses X% graduation progress (Today data)
- *  - whale:      a single buy/sell above X USDG (Flow tape data)
+ *  - whale:      a single buy/sell above X USD (Flow tape data)
  *  - launch:     a new token launch appears on the curves (Today data)
  *
  * Rules + fired alerts + dedup state persist in localStorage. The engine
@@ -14,13 +14,14 @@
 
 import type { NearGraduation } from "./graduation";
 import type { TapeEntry } from "./tape";
+import { USDC_MINT, WSOL_MINT, getSolPrice } from "./solana";
 
 export type AlertRuleType = "graduation" | "whale" | "launch";
 
 export interface AlertRule {
   id: string;
   type: AlertRuleType;
-  /** graduation: percent (0-100). whale: USDG amount. launch: unused. */
+  /** graduation: percent (0-100). whale: USD amount. launch: unused. */
   threshold: number;
   enabled: boolean;
 }
@@ -35,8 +36,7 @@ export interface FiredAlert {
   firedAt: number; // ms epoch
 }
 
-export const EXPLORER = "https://robinhoodchain.blockscout.com";
-export const USDG = "0x5fc5360d0400a0fd4f2af552add042d716f1d168";
+export const EXPLORER = "https://solscan.io";
 
 const LS_RULES = "raven:alert-rules";
 const LS_KEYS = "raven:alert-keys";
@@ -63,8 +63,8 @@ export const RULE_META: Record<
   },
   whale: {
     label: "Whale trade",
-    hint: "Fire on a single buy or sell at/above this USDG size",
-    unit: "USDG",
+    hint: "Fire on a single buy or sell at/above this USD size",
+    unit: "USD",
     defaultThreshold: 1000,
     needsThreshold: true,
   },
@@ -91,24 +91,38 @@ export function defaultRules(): AlertRule[] {
   ];
 }
 
-/** USDG value of a tape entry, or null when neither leg is USDG. */
-export function usdgValue(e: TapeEntry): number | null {
-  const inIsUsdg = e.tokenIn.toLowerCase() === USDG;
-  const outIsUsdg = e.tokenOut.toLowerCase() === USDG;
-  if (!inIsUsdg && !outIsUsdg) return null;
-  const raw = inIsUsdg ? e.amountInRaw : e.amountOutRaw;
-  const decimals = inIsUsdg ? e.amountInDecimals : e.amountOutDecimals;
+/** USD value of a tape entry's quote leg, or null when neither leg is a quote asset. */
+export async function usdValue(e: TapeEntry): Promise<number | null> {
+  const inMint = e.tokenIn;
+  const outMint = e.tokenOut;
+  const inIsQuote = inMint === WSOL_MINT || inMint === USDC_MINT;
+  const outIsQuote = outMint === WSOL_MINT || outMint === USDC_MINT;
+  if (!inIsQuote && !outIsQuote) return null;
+  const mint = inIsQuote ? inMint : outMint;
+  const raw = inIsQuote ? e.amountInRaw : e.amountOutRaw;
+  const decimals = inIsQuote ? e.amountInDecimals : e.amountOutDecimals;
+  let amount: number;
   try {
-    return Number(BigInt(raw)) / 10 ** decimals;
+    amount = Number(BigInt(raw)) / 10 ** decimals;
   } catch {
     return null;
   }
+  if (mint === USDC_MINT) return amount;
+  const solPrice = await getSolPrice();
+  if (solPrice === null) return null;
+  return amount * solPrice;
 }
 
-function fmtUsdg(n: number): string {
+function fmtUsd(n: number): string {
+  if (n >= 1_000_000) return "$" + (n / 1_000_000).toFixed(2) + "M";
+  if (n >= 1_000) return "$" + (n / 1_000).toFixed(1) + "K";
+  return "$" + n.toFixed(0);
+}
+
+function fmtSol(n: number): string {
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(2) + "M";
   if (n >= 1_000) return (n / 1_000).toFixed(1) + "K";
-  return n.toFixed(0);
+  return n.toFixed(1);
 }
 
 /**
@@ -117,12 +131,12 @@ function fmtUsdg(n: number): string {
  *  - graduation keys re-arm when progress falls 5 points below threshold
  *  - whale keys are per-txHash and never re-arm
  */
-export function evaluateAlerts(
+export async function evaluateAlerts(
   rules: AlertRule[],
   nearing: NearGraduation[],
   entries: TapeEntry[],
   firedKeys: Set<string>,
-): FiredAlert[] {
+): Promise<FiredAlert[]> {
   const out: FiredAlert[] = [];
   const now = Date.now();
 
@@ -141,7 +155,7 @@ export function evaluateAlerts(
               ruleId: rule.id,
               type: "graduation",
               title: `$${t.symbol} crossed ${rule.threshold}% graduation`,
-              detail: `now at ${pct.toFixed(1)}% — ${fmtUsdg(t.raised)} / ${fmtUsdg(t.threshold)} USDG raised`,
+              detail: `now at ${pct.toFixed(1)}% — ${fmtSol(t.raised)} / ${fmtSol(t.threshold)} SOL raised`,
               link: `${EXPLORER}/token/${t.token}`,
               firedAt: now,
             });
@@ -155,7 +169,7 @@ export function evaluateAlerts(
     if (rule.type === "whale") {
       for (const e of entries) {
         if (e.direction !== "buy" && e.direction !== "sell") continue;
-        const v = usdgValue(e);
+        const v = await usdValue(e);
         if (v === null || v < rule.threshold) continue;
         const key = `whale:${e.txHash}`;
         if (!firedKeys.has(key)) {
@@ -166,7 +180,7 @@ export function evaluateAlerts(
             id: uid("alert"),
             ruleId: rule.id,
             type: "whale",
-            title: `Whale ${e.direction}: ${fmtUsdg(v)} USDG on $${token}`,
+            title: `Whale ${e.direction}: ${fmtUsd(v)} on $${token}`,
             detail: `${e.amountIn} ${e.tokenInSymbol} → ${e.amountOut} ${e.tokenOutSymbol}`,
             link: `${EXPLORER}/tx/${e.txHash}`,
             firedAt: now,
@@ -201,7 +215,7 @@ export function detectLaunches(
         ruleId: "launch",
         type: "launch",
         title: `New launch: $${t.symbol}`,
-        detail: `bonding curve at ${(t.progress * 100).toFixed(1)}% — ${fmtUsdg(t.raised)} USDG raised so far`,
+        detail: `bonding curve at ${(t.progress * 100).toFixed(1)}% — ${fmtSol(t.raised)} SOL raised so far`,
         link: `${EXPLORER}/token/${t.token}`,
         firedAt: now,
       });
